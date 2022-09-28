@@ -15,5 +15,5 @@
 # vendor/
 
 .npm.ini
-go.mod
-go.sum
+nrun
+.idea

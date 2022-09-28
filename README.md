@@ -1,11 +1,11 @@
 # nrun - The npm script runner
 nrun is a simple wrapper for **npm run** with some nice features
 
-nrun will lookup the package.json used by the current project and execute the named script found in the scripts section of the package.json.
+nrun will lookup the closest package.json used by the current project and execute the named script found in the scripts section of that package.json.
 
 The major reason for using it is the number of keystrokes that can be saved. When typing the same commands over and over again it can be annoying, even though you might use the up arrow in the terminal and repeat an earlier command.
 
-It's also much easier to map your most used command to shorter ones that are easier to remember.
+It's also much easier to map your most used command to shorter ones that are easier to remember and faster to type.
 
 So if you have to type something like
 ``` bash
@@ -19,7 +19,7 @@ And by using shortcuts in .nrun.ini you might shorten this even more to
 ``` bash
 # > nrun test
 ```
-or aomething else that is easier to remember and faster to type.
+or something else that is easier to remember and faster to type.
 
 And if you're not sure on which scripts there are available you can easily type
 ``` bash
@@ -41,6 +41,13 @@ and the command that this script runs will be printed out.
   nrun -s <scriptname>       Show the script without running it
   nrun -h                    Shows this help
 ```
+
+## Installation
+```bash
+# > git clone git@github.com:codedeviate/nrun.git
+# > go build -o nrun main.go
+```
+
 ## .nrun.ini
 Often used scriptnames can be mapped to other and shorter names in a file called .nrun.ini.
 
@@ -64,7 +71,15 @@ start=start:localhost
 start_localhost=PORT=3007
 ```
 
-If you are in **/Users/codedeviate/Development/nruntest** and execute **nrun start** then that will be the same as executing **PORT=3007 nrun start:localhost** which is saving some keystrokes.
+If you are in **/Users/codedeviate/Development/nruntest** and execute 
+```bash
+nrun start
+```
+then that will be the same as executing
+```bash
+PORT=3007 nrun start:localhost
+```
+which is saving some keystrokes.
 
 ### Global mapping and environment
 Global section names are "\*" for mapping values and "ENV:\*" for environment values. These values will be overridden by values defined in the specific directory.
