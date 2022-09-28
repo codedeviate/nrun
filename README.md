@@ -1,5 +1,7 @@
 # nrun - The npm script runner
-nrun is a simple wrapper for **npm run** with some nice features
+nrun is a simple wrapper for **npm run** with some nice features. It is written in Go which I find easier to use when creating portable executable code.
+
+Even though the goal is to make it portable nrun will need a shell to run. So Linux users and Mac users can probably run it smoothly whilst users stuck in Windows will have to run Cygwin or something like that. Initially this tool will support bash and zsh. Other shells and environments might be added at a later stage.
 
 nrun will lookup the closest package.json used by the current project and execute the named script found in the scripts section of that package.json.
 
@@ -38,15 +40,21 @@ and the command that this script runs will be printed out.
   nrun <scriptname> [args]   Run the script by name
   nrun -l                    Shows all available scripts
   nrun                       Shows all available scripts (same as the -l flag)
-  nrun -s <scriptname>       Show the script without running it
-  nrun -h                    Shows this help
+  nrun -s <scriptname>       Show the script that will be executed without running it
+  nrun -h                    Shows help section
 ```
 
 ## Installation
 ```bash
 # > git clone git@github.com:codedeviate/nrun.git
+# > cd nrun
+# > go install
 # > go build -o nrun main.go
 ```
+
+### Dependencies
+There is currently one dependency
+* [gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1)
 
 ## .nrun.ini
 Often used scriptnames can be mapped to other and shorter names in a file called .nrun.ini.
