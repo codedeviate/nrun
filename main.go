@@ -27,8 +27,6 @@ type PackageJSON struct {
 	DevDependencies map[string]string `json:"devDependencies"`
 }
 
-type DefaultValues map[string]interface{}
-
 func ProcessPath(path string) (*PackageJSON, string, error) {
 	if _, err := os.Stat(path + "/package.json"); errors.Is(err, os.ErrNotExist) {
 		parts := strings.Split(path, "/")
@@ -37,7 +35,7 @@ func ProcessPath(path string) (*PackageJSON, string, error) {
 		if len(path) > 0 {
 			return ProcessPath(path)
 		}
-		return nil, "", errors.New("No package.json found")
+		return nil, "", errors.New("no package.json found")
 	}
 	file, _ := os.ReadFile(path + "/package.json")
 	packageJSON := PackageJSON{}
@@ -113,7 +111,7 @@ func GetShell() (string, error) {
 	if _, err := os.Stat("/bin/bash"); !errors.Is(err, os.ErrNotExist) {
 		return "/bin/bash", nil
 	}
-	return "", errors.New("Can't find any shell")
+	return "", errors.New("can't find any shell")
 }
 
 func CollectDefaultValues(inifile string, path string) (map[string]string, error) {
@@ -207,18 +205,18 @@ func main() {
 		fmt.Println("nrun will lookup the package.json used by the current project and execute the named script found in the scripts section of the package.json.")
 		fmt.Println("")
 		fmt.Println("Usage:")
-		fmt.Println("  nrun <scriptname> [args]   Run the script by name")
+		fmt.Println("  nrun <script name> [args]  Run the script by name")
 		fmt.Println("  nrun -l                    Shows all available scripts")
 		fmt.Println("  nrun                       Shows all available scripts (same as the -l flag)")
-		fmt.Println("  nrun -s <scriptname>       Show the script without running it")
+		fmt.Println("  nrun -s <script name>      Show the script without running it")
 		fmt.Println("  nrun -h                    Shows this help")
 		fmt.Println("")
 		fmt.Println(".nrun.ini in home directory")
 		fmt.Println("===========================")
-		fmt.Println("Often used scriptnames can be mapped to other and shorter names in a file called .nrun.ini.")
+		fmt.Println("Often used script names can be mapped to other and shorter names in a file called .nrun.ini.")
 		fmt.Println("This file should be placed in either the users home directory or in the same directory as the package.json.")
 		fmt.Println("The format is more or less a standard ini-file. But there is one major difference. Section names can't contain colons and are therefor replaced with underscores.")
-		fmt.Println("The section name is the full pathname of the directoru that contains the package.json file.")
+		fmt.Println("The section name is the full pathname of the directory that contains the package.json file.")
 		fmt.Println("The section name must be a full path without any trailing slash.")
 		fmt.Println("Environment variables can be defined by adding \"ENV:\" as a prefix to the sections name.")
 		fmt.Println("These environment variables is not connected to the keys in the same directory but rather to the full script name.")
