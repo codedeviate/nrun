@@ -15,5 +15,7 @@
 # vendor/
 
 .npm.ini
+.nrun.ini
+.nrun.json
 nrun
 .idea

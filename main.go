@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"gopkg.in/ini.v1"
 	"log"
 	"os"
 	"os/exec"
@@ -25,6 +24,11 @@ type PackageJSON struct {
 	Dependencies    map[string]string `json:"dependencies"`
 	Nyc             map[string]string `json:"nyc"`
 	DevDependencies map[string]string `json:"devDependencies"`
+}
+
+type Config struct {
+	Env  map[string]map[string]string `json:"env"`
+	Path map[string]map[string]string `json:"path"`
 }
 
 func ProcessPath(path string) (*PackageJSON, string, error) {
@@ -76,7 +80,7 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 	}
 }
 
-func ShowScripts(packageJSON PackageJSON) {
+func ShowScripts(packageJSON PackageJSON, defaultValues map[string]string, defaultEnvironment map[string]string) {
 	if len(packageJSON.Scripts) > 0 {
 		fmt.Println("The following scripts are available")
 		scripts := make([]string, 0, len(packageJSON.Scripts))
@@ -89,6 +93,18 @@ func ShowScripts(packageJSON PackageJSON) {
 		}
 	} else {
 		fmt.Println("There are no scripts available")
+	}
+	if len(defaultValues) > 0 {
+		fmt.Println("The following default values are available")
+		for k, v := range defaultValues {
+			fmt.Printf(" - %s: %s\n", k, v)
+		}
+	}
+	if len(defaultEnvironment) > 0 {
+		fmt.Println("The following default environment values are available")
+		for k, v := range defaultEnvironment {
+			fmt.Printf(" - %s: %s\n", k, v)
+		}
 	}
 }
 
@@ -114,82 +130,59 @@ func GetShell() (string, error) {
 	return "", errors.New("can't find any shell")
 }
 
-func CollectDefaultValues(inifile string, path string) (map[string]string, error) {
-	cfg, err := ini.Load(inifile)
-	if err != nil {
-		return nil, err
-	}
-	var defaults = make(map[string]string, 1000)
-	if cfg.Section(path) != nil {
-		keys := cfg.Section(path).Keys()
-		for _, key := range keys {
-			defaults[key.Name()] = key.Value()
-		}
-	}
-	return defaults, nil
-}
-
 func GetDefaultValues(path string) (map[string]string, map[string]string) {
 	defaults := make(map[string]string, 1000)
 	defaultEnvs := make(map[string]string, 1000)
 	usr, _ := user.Current()
 	dir := usr.HomeDir
-	if _, err := os.Stat(dir + "/.nrun.ini"); !errors.Is(err, os.ErrNotExist) {
-		defWild, _ := CollectDefaultValues(dir+"/.nrun.ini", "*")
-		if defWild != nil {
-			for key, value := range defWild {
-				defaults[key] = value
+	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
+		jsonFile, err := os.Open(dir + "/.nrun.json")
+		if err != nil {
+			fmt.Println("Failed with", err)
+		} else {
+			defer jsonFile.Close()
+			byteValue, _ := os.ReadFile(jsonFile.Name())
+			var config Config
+			_ = json.Unmarshal(byteValue, &config)
+			for k, v := range config.Path["*"] {
+				defaults[k] = v
 			}
-		}
-		defWildEnv, _ := CollectDefaultValues(dir+"/.nrun.ini", "ENV:*")
-		if defWildEnv != nil {
-			for key, value := range defWildEnv {
-				defaultEnvs[key] = value
+			for k, v := range config.Path[path] {
+				defaults[k] = v
 			}
-		}
-		def, _ := CollectDefaultValues(dir+"/.nrun.ini", path)
-		if def != nil {
-			for key, value := range def {
-				defaults[key] = value
+			for k, v := range config.Env["*"] {
+				defaultEnvs[k] = v
 			}
-		}
-		defEnv, _ := CollectDefaultValues(dir+"/.nrun.ini", "ENV:"+path)
-		if def != nil {
-			for key, value := range defEnv {
-				defaultEnvs[key] = value
+			for k, v := range config.Env[path] {
+				defaultEnvs[k] = v
 			}
 		}
 	}
-	if _, err := os.Stat("./.nrun.ini"); !errors.Is(err, os.ErrNotExist) {
-		defWild, _ := CollectDefaultValues("./.nrun.ini", path)
-		if defWild != nil {
-			for key, value := range defWild {
-				if len(defaults[key]) == 0 {
-					defaults[key] = value
-				}
+
+	if _, err := os.Stat("./.nrun.json"); !errors.Is(err, os.ErrNotExist) {
+		jsonFile, err := os.Open("./.nrun.json")
+		if err != nil {
+			fmt.Println("Failed with", err)
+		} else {
+			defer jsonFile.Close()
+			byteValue, _ := os.ReadFile(jsonFile.Name())
+			var config Config
+			_ = json.Unmarshal(byteValue, &config)
+			for k, v := range config.Path["*"] {
+				defaults[k] = v
 			}
-		}
-		defWildEnv, _ := CollectDefaultValues("./.nrun.ini", "ENV:"+path)
-		if defWildEnv != nil {
-			for key, value := range defWildEnv {
-				if len(defaultEnvs[key]) == 0 {
-					defaultEnvs[key] = value
-				}
+			for k, v := range config.Path[path] {
+				defaults[k] = v
 			}
-		}
-		def, _ := CollectDefaultValues("./.nrun.ini", path)
-		if def != nil {
-			for key, value := range def {
-				defaults[key] = value
+			for k, v := range config.Env["*"] {
+				defaultEnvs[k] = v
 			}
-		}
-		defEnv, _ := CollectDefaultValues("./.nrun.ini", "ENV:"+path)
-		if def != nil {
-			for key, value := range defEnv {
-				defaultEnvs[key] = value
+			for k, v := range config.Env[path] {
+				defaultEnvs[k] = v
 			}
 		}
 	}
+
 	return defaults, defaultEnvs
 }
 
@@ -211,7 +204,7 @@ func main() {
 		fmt.Println("  nrun -s <script name>      Show the script without running it")
 		fmt.Println("  nrun -h                    Shows this help")
 		fmt.Println("")
-		fmt.Println(".nrun.ini in home directory")
+		fmt.Println(".nrun.json in home directory")
 		fmt.Println("===========================")
 		fmt.Println("Often used script names can be mapped to other and shorter names in a file called .nrun.ini.")
 		fmt.Println("This file should be placed in either the users home directory or in the same directory as the package.json.")
@@ -222,13 +215,21 @@ func main() {
 		fmt.Println("These environment variables is not connected to the keys in the same directory but rather to the full script name.")
 		fmt.Println("Global section names are \"*\" for mapping values and \"ENV:*\" for environment values. These values will be overridden by values defined in the specific directory.")
 		fmt.Println("")
-		fmt.Println("Example .nrun.ini")
-		fmt.Println("[/Users/codedeviate/Development/nruntest]")
-		fmt.Println("start=start:localhost")
-		fmt.Println("[ENV:/Users/codedeviate/Development/nruntest]")
-		fmt.Println("start_localhost=PORT=3007")
-		fmt.Println("")
-		fmt.Println("If you are in \"/Users/codedeviate/Development/nruntest\" and execute \"nrun start\" then that will be the same as executing \"PORT=3007 nrun start:localhost\" which is much shorter.")
+		fmt.Println("Example .nrun.json")
+		fmt.Println("{")
+		fmt.Println("  \"env\": {")
+		fmt.Println("    \"/Users/codedeviate/Development/nruntest\": {")
+		fmt.Println("      \"start:localhost\": \"PORT=3007\"")
+		fmt.Println("    }")
+		fmt.Println("  },")
+		fmt.Println("  \"path\": {")
+		fmt.Println("    \"/Users/codedeviate/Development/nruntest\": {")
+		fmt.Println("      \"start\": \"start:localhost\",")
+		fmt.Println("      \"test\": \"test:localhost:coverage\"")
+		fmt.Println("    }")
+		fmt.Println("  }")
+		fmt.Println("}")
+		fmt.Println("If you are in \"/Users/codedeviate/Development/nruntest\" and execute \"nrun start\" then that will be the same as executing \"PORT=3007 npm run start:localhost\" which is much shorter.")
 		return
 	}
 	args := flag.Args()
@@ -244,20 +245,17 @@ func main() {
 	}
 	packageJSON, path, processErr := ProcessPath(path)
 	defaultValues, defaultEnvironment := GetDefaultValues(path)
+
 	if defaultValues != nil {
 		if len(defaultValues[script]) > 0 {
 			script = defaultValues[script]
-		}
-		scriptNice := strings.Replace(script, ":", "_", -1)
-		if len(defaultValues[scriptNice]) > 0 {
-			script = defaultValues[scriptNice]
 		}
 	}
 	if processErr != nil {
 		fmt.Println(processErr)
 	} else {
 		if len(args) == 0 || *showList == true {
-			ShowScripts(*packageJSON)
+			ShowScripts(*packageJSON, defaultValues, defaultEnvironment)
 		} else if *showScript == true {
 			ShowScript(*packageJSON, script)
 		} else {

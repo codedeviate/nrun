@@ -53,30 +53,37 @@ and the command that this script runs will be printed out.
 ```
 
 ### Dependencies
-There is currently one dependency
-* [gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1)
+There is currently no dependencies for this tool.
+* ~~[gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1)~~
 
-## .nrun.ini
-Often used scriptnames can be mapped to other and shorter names in a file called .nrun.ini.
+## .nrun.json
+Often used scriptnames can be mapped to other and shorter names in a file called .nrun.json.
 
 This file should be placed in either the users home directory or in the same directory as the package.json.
 
-The format is more or less a standard ini-file. But there are some difference.
-* Key names can't contain colons and are therefore replaced with underscores.
+The format is more or less a standard JSON-file. But there are some difference.
+* ~~Key names can't contain colons and are therefore replaced with underscores.~~
 * The section name is the full pathname of the directory that contains the package.json file.
 * The section name must be a full path without any trailing slash.
 
-Environment variables can be defined by adding "ENV:" as a prefix to the sections name.
+Paths are defined under a key called "path" and environment variables are defined under a key called "env".
 
-These environment variables is not connected to the keys in the same directory but rather to the full script name.
+The environment variables is not connected to the keys in the same directory but rather to the full script name.
 
-### Example .nrun.ini
-```ini
-[/Users/codedeviate/Development/nruntest]
-start=start:localhost
-
-[ENV:/Users/codedeviate/Development/nruntest]
-start_localhost=PORT=3007
+### Example .nrun.json
+```json
+{
+  "path": {
+    "/Users/codedeviate/Development/nruntest": {
+      "start": "start:localhost"
+    }
+  },
+  "env": {
+    "/Users/codedeviate/Development/nruntest": {
+      "start:localhost": "PORT=3007"
+    }
+  }
+}
 ```
 
 If you are in **/Users/codedeviate/Development/nruntest** and execute 
@@ -85,25 +92,32 @@ nrun start
 ```
 then that will be the same as executing
 ```bash
-PORT=3007 nrun start:localhost
+PORT=3007 npm run start:localhost
 ```
 which is saving some keystrokes.
 
 ### Global mapping and environment
-Global section names are "\*" for mapping values and "ENV:\*" for environment values. These values will be overridden by values defined in the specific directory.
+Global section names are "\*" for mapping values and "\*" for environment values. These values will be overridden by values defined in the specific directory.
 
-```ini
-[*]
-test=test:coverage:localhost
-
-[ENV:*]
-test_coverage_localhost=PORT=3007
-
-[/Users/codedeviate/Development/nruntest]
-start=start:localhost
-
-[ENV:/Users/codedeviate/Development/nruntest]
-start_localhost=PORT=3007
+```json
+{
+  "path": {
+    "/Users/codedeviate/Development/nruntest": {
+      "start": "start:localhost"
+    },
+    "*": {
+      "test": "test:coverage:localhost"
+    }
+  },
+  "env": {
+    "/Users/codedeviate/Development/nruntest": {
+      "test:coverage:localhost": "PORT=3007"
+    },
+    "*": {
+      "test:coverage:localhost": "PORT=3009"
+    }
+  }
+}
 ```
 Now you can be in any project directory and type
 ``` bash
@@ -111,5 +125,5 @@ Now you can be in any project directory and type
 ```
 which is the equivalent to
 ``` bash
-# > PORT=3007 npm run test:coverage:localhost
+# > PORT=3009 npm run test:coverage:localhost
 ```
