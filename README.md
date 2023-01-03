@@ -1,9 +1,12 @@
 # nrun - The npm script runner
+
+**Current version is v0.9.0**
+
 nrun is a simple wrapper for **npm run** with some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
-Even though the goal is to make it portable nrun will need a shell to run. So Linux users and Mac users can probably run it smoothly whilst users stuck in Windows will have to run Cygwin or something like that. Initially this tool will support bash and zsh. Other shells and environments might be added at a later stage.
+Even though the goal is to make it portable, nrun will still need a shell to run. So Linux users and Mac users can probably run it smoothly whilst users stuck in Windows will have to run Cygwin or something like that. Initially this tool will support bash and zsh. Other shells and environments might be added at a later stage.
 
-nrun will lookup the closest package.json used by the current project and execute the named script found in the scripts section of that package.json.
+nrun will attempt to find the closest package.json (hierarchically upwards) used by the current project and execute the named script found in the scripts section of that package.json.
 
 The major reason for using it is the number of keystrokes that can be saved. When typing the same commands over and over again it can be annoying, even though you might use the up arrow in the terminal and repeat an earlier command.
 
@@ -40,6 +43,7 @@ and the command that this script runs will be printed out.
   nrun <scriptname> [args]   Run the script by name
   nrun -l                    Shows all available scripts
   nrun                       Shows all available scripts (same as the -l flag)
+  nrun -p <project>          Run the script in the specified projects path
   nrun -s <scriptname>       Show the script that will be executed without running it
   nrun -h                    Shows help section
 ```
@@ -68,6 +72,9 @@ The format is more or less a standard JSON-file. But there are some difference.
 
 Paths are defined under a key called "path" and environment variables are defined under a key called "env".
 
+Projects are defined under a key called "projects" and the key name is the name of the project and the value is the path to the project.
+Projects can only be defined in the global .nrun.json file.
+
 The environment variables is not connected to the keys in the same directory but rather to the full script name.
 
 ### Example .nrun.json
@@ -82,6 +89,9 @@ The environment variables is not connected to the keys in the same directory but
     "/Users/codedeviate/Development/nruntest": {
       "start:localhost": "PORT=3007"
     }
+  },
+  "projects": {
+    "nruntest": "/Users/codedeviate/Development/nruntest"
   }
 }
 ```
@@ -116,6 +126,9 @@ Global section names are "\*" for mapping values and "\*" for environment values
     "*": {
       "test:coverage:localhost": "PORT=3009"
     }
+  },
+  "projects": {
+    "nruntest": "/Users/codedeviate/Development/nruntest"
   }
 }
 ```
@@ -126,4 +139,19 @@ Now you can be in any project directory and type
 which is the equivalent to
 ``` bash
 # > PORT=3009 npm run test:coverage:localhost
+```
+
+If you are in a different path than you project then you can use the -p flag to specify the path to the project.
+``` bash
+# > nrun -p nruntest test
+```
+This is the same as
+``` bash
+# > cd /Users/codedeviate/Development/nruntest
+# > nrun test
+```
+
+
+``` bash
+# > nrun -p /Users/codedeviate/Development/nruntest test
 ```

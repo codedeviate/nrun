@@ -1,0 +1,13 @@
+{
+    "name": "nrundemo",
+    "version": "0.0.1",
+    "description": "Demo for a simple node.js script runner",
+    "scripts": {
+        "run": "go run main.go",
+        "build": "make local",
+        "build-all": "make all",
+        "build-local": "make local",
+        "build-util": "make util",
+        "hello": "./nrun hello"
+    }
+}
