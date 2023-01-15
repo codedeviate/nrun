@@ -213,4 +213,4 @@ This will build the tool and move it to the ~/go/bin directory. If you don't hav
 ```bash
 # > make all
 ```
-This will call all the other targets.
+This will create all the targets.
