@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-const version = "0.10.0"
+const version = "0.10.1"
 
 type PackageJSON struct {
 	Name            string            `json:"name"`

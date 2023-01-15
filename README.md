@@ -1,8 +1,10 @@
 # nrun - The npm script runner
 
-**Current version is v0.10.0**
+**Current version is v0.10.1**
 
-nrun is a simple wrapper for **npm run** with some nice features. It is written in Go which I find easier to use when creating portable executable code.
+nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
+
+There is no requirement to have **npm** installed to use nrun. The scripts in package.json are parsed and executed directly.
 
 Even though the goal is to make it portable, nrun will still need a shell to run. So Linux users and Mac users can probably run it smoothly whilst users stuck in Windows will have to run Cygwin or something like that. Initially this tool will support bash and zsh. Other shells and environments might be added at a later stage.
 
