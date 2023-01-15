@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.9.0**
+**Current version is v0.10.0**
 
 nrun is a simple wrapper for **npm run** with some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
