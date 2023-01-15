@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -130,28 +131,34 @@ func ShowScript(packageJSON PackageJSON, script string) {
 
 func GetShellByMagic(key string) (string, error) {
 	cmd := exec.Command("which", key)
-	path, _ := cmd.Output()
-	if len(path) > 0 {
+	path, err := cmd.Output()
+
+	if err == nil && len(path) > 0 {
 		spath := strings.Trim(string(path), " \n")
 		_, err := os.Stat(spath)
 		return spath, err
 	}
-	return "", errors.New("can't find the requested shell")
+	return "", errors.New("shell not found")
+}
+
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func GetShell() (string, error) {
 	envShell := os.Getenv("SHELL")
-	if len(envShell) > 0 {
+	if len(envShell) > 0 && FileExists(envShell) {
 		return envShell, nil
 	}
 	// Try some magic to find shell
-	if shell, err := GetShellByMagic("zsh"); !errors.Is(err, os.ErrNotExist) {
+	if shell, err := GetShellByMagic("zsh"); err == nil {
 		return shell, nil
 	}
-	if shell, err := GetShellByMagic("bash"); !errors.Is(err, os.ErrNotExist) {
+	if shell, err := GetShellByMagic("bash"); err == nil {
 		return shell, nil
 	}
-	if shell, err := GetShellByMagic("sh"); !errors.Is(err, os.ErrNotExist) {
+	if shell, err := GetShellByMagic("sh"); err == nil {
 		return shell, nil
 	}
 	return "", errors.New("can't find any shell")
@@ -220,6 +227,141 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 	return defaults, defaultEnvs, projects
 }
 
+func addProjectToConfig(args []string) {
+	usr, _ := user.Current()
+	dir := usr.HomeDir
+	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
+		jsonFile, err := os.Open(dir + "/.nrun.json")
+		if err != nil {
+			log.Println("Failed with", err)
+		} else {
+			byteValue, _ := os.ReadFile(jsonFile.Name())
+			var config Config
+			_ = json.Unmarshal(byteValue, &config)
+			jsonFile.Close()
+			err = copyFile(jsonFile.Name(), jsonFile.Name()+".bak")
+			if err != nil {
+				log.Println("Failed with", err)
+			} else {
+				projPath := args[1]
+				if projPath[0:2] == ".." {
+					cwd, _ := os.Getwd()
+					projPath = cwd + "/" + projPath
+				} else if projPath[0] == '.' {
+					cwd, _ := os.Getwd()
+					projPath = cwd + projPath[1:]
+				}
+				projPath, _ = filepath.Abs(projPath)
+				if _, err := os.Stat(projPath); errors.Is(err, os.ErrNotExist) {
+					fmt.Println("The path", "\""+projPath+"\"", "doesn't exists")
+					return
+				}
+				if _, ok := config.Projects[args[0]]; ok {
+					if config.Projects[args[0]] == projPath {
+						fmt.Println("Project", "\""+args[0]+"\"", "already exists with this path")
+						return
+					}
+					fmt.Println("Project", "\""+args[0]+"\"", "located at", "\""+config.Projects[args[0]]+"\"", "will be replaced with", "\""+projPath+"\"")
+				}
+				config.Projects[args[0]] = projPath
+				jsonFile, err := os.Create(jsonFile.Name())
+				if err != nil {
+					log.Println("Failed with", err)
+				} else {
+					defer jsonFile.Close()
+					jsonData, _ := json.MarshalIndent(config, "", "  ")
+					_, err = jsonFile.Write(jsonData)
+					if err != nil {
+						log.Println("Failed with", err)
+					}
+					fmt.Println("Project", "\""+args[0]+"\"", "added")
+				}
+			}
+		}
+	}
+}
+
+func removeProjectFromConfig(args []string) {
+	usr, _ := user.Current()
+	dir := usr.HomeDir
+	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
+		jsonFile, err := os.Open(dir + "/.nrun.json")
+		if err != nil {
+			log.Println("Failed with", err)
+		} else {
+			byteValue, _ := os.ReadFile(jsonFile.Name())
+			var config Config
+			_ = json.Unmarshal(byteValue, &config)
+			jsonFile.Close()
+			err = copyFile(jsonFile.Name(), jsonFile.Name()+".bak")
+			if err != nil {
+				log.Println("Failed with", err)
+			} else {
+				delete(config.Projects, args[0])
+				jsonFile, err := os.Create(jsonFile.Name())
+				if err != nil {
+					log.Println("Failed with", err)
+				} else {
+					defer jsonFile.Close()
+					jsonData, _ := json.MarshalIndent(config, "", "  ")
+					_, err = jsonFile.Write(jsonData)
+					if err != nil {
+						log.Println("Failed with", err)
+					}
+					fmt.Println("Project", "\""+args[0]+"\"", "removed")
+					if len(args) > 1 {
+						args = args[1:]
+						removeProjectFromConfig(args)
+					}
+				}
+			}
+		}
+	}
+}
+
+func listProjectsFromConfig() {
+	usr, _ := user.Current()
+	dir := usr.HomeDir
+	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
+		jsonFile, err := os.Open(dir + "/.nrun.json")
+		if err != nil {
+			log.Println("Failed with", err)
+		} else {
+			byteValue, _ := os.ReadFile(jsonFile.Name())
+			var config Config
+			_ = json.Unmarshal(byteValue, &config)
+			jsonFile.Close()
+			maxLength := 0
+			for k, _ := range config.Projects {
+				if len(k) > maxLength {
+					maxLength = len(k)
+				}
+			}
+
+			if maxLength > 0 {
+				fmt.Println("The following projects are registered:")
+			} else {
+				fmt.Println("No projects are registered.")
+			}
+			for k, v := range config.Projects {
+				fmt.Printf("%-*s : %s\n", maxLength, k, v)
+			}
+		}
+	}
+}
+
+func copyFile(src string, dst string) error {
+	input, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dst, input, 0644)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
 func main() {
 	showScript := flag.Bool("s", false, "Show the script")
 	showHelp := flag.Bool("h", false, "Show help")
@@ -227,6 +369,10 @@ func main() {
 	showVersion := flag.Bool("v", false, "Show current version")
 	dummyCode := flag.Bool("d", false, "Exec some development dummy code")
 	useAnotherPath := flag.String("p", "", "Use another path to find the package.json")
+	addProject := flag.Bool("ap", false, "Add a project to the config")
+	removeProject := flag.Bool("rp", false, "Remove a project from the config")
+	listProjects := flag.Bool("lp", false, "List all projects from the config")
+
 	flag.Parse()
 
 	if *showHelp == true {
@@ -237,12 +383,15 @@ func main() {
 		fmt.Println("Version: ", version)
 		fmt.Println("")
 		fmt.Println("Usage:")
-		fmt.Println("  nrun <script name> [args]  Run the script by name")
-		fmt.Println("  nrun -l                    Shows all available scripts")
-		fmt.Println("  nrun                       Shows all available scripts (same as the -l flag)")
-		fmt.Println("  nrun -s <script name>      Show the script without running it")
-		fmt.Println("  nrun -h                    Shows this help")
-		fmt.Println("  nrun -v                    Shows current version")
+		fmt.Println("  nrun <script name> [args]       Run the script by name")
+		fmt.Println("  nrun -l                         Shows all available scripts")
+		fmt.Println("  nrun                            Shows all available scripts (same as the -l flag)")
+		fmt.Println("  nrun -s <script name>           Show the script without running it")
+		fmt.Println("  nrun -h                         Shows this help")
+		fmt.Println("  nrun -v                         Shows current version")
+		fmt.Println("  nrun -lp                        List all projects from the config")
+		fmt.Println("  nrun -ap <project name> <path>  Add a project to the config")
+		fmt.Println("  nrun -rp <project name>         Remove a project from the config")
 		fmt.Println("")
 		fmt.Println(".nrun.json in home directory")
 		fmt.Println("===========================")
@@ -268,24 +417,62 @@ func main() {
 		fmt.Println("      \"test\": \"test:localhost:coverage\"")
 		fmt.Println("    }")
 		fmt.Println("  }")
+		fmt.Println("  \"projects\": {")
+		fmt.Println("    \"proj1\": \"/home/username/development/project1\",")
+		fmt.Println("    \"proj2\": \"/home/username/development/project2\"")
+		fmt.Println("  }")
 		fmt.Println("}")
 		fmt.Println("If you are in \"/Users/codedeviate/Development/nruntest\" and execute \"nrun start\" then that will be the same as executing \"PORT=3007 npm run start:localhost\" which is much shorter.")
 		return
 	}
 
+	if *listProjects == true {
+		listProjectsFromConfig()
+		return
+	}
+	if *addProject == true {
+		addProjectToConfig(flag.Args())
+		return
+	}
+	if *removeProject == true {
+		removeProjectFromConfig(flag.Args())
+		return
+	}
 	if *dummyCode == true {
-		cmd := exec.Command("which", "bash")
+		fmt.Println("Dummy code that outputs the path to different shells if they are found")
+
+		cmd := exec.Command("which", "sh")
 		stdout, _ := cmd.Output()
-		fmt.Println(strings.Trim(string(stdout), " \n"))
+		fmt.Println("Bourne Shell (sh)                 :", strings.Trim(string(stdout), " \n"))
+
+		cmd = exec.Command("which", "bash")
+		stdout, _ = cmd.Output()
+		fmt.Println("GNU Bourne-Again Shell (bash)     :", strings.Trim(string(stdout), " \n"))
+
+		cmd = exec.Command("which", "csh")
+		stdout, _ = cmd.Output()
+		fmt.Println("C Shell (csh)                     :", strings.Trim(string(stdout), " \n"))
+
+		cmd = exec.Command("which", "ksh")
+		stdout, _ = cmd.Output()
+		fmt.Println("Korn Shell (ksh)                  :", strings.Trim(string(stdout), " \n"))
+
 		cmd = exec.Command("which", "zsh")
 		stdout, _ = cmd.Output()
-		fmt.Println(strings.Trim(string(stdout), " \n"))
-		cmd = exec.Command("which", "sh")
+		fmt.Println("Z Shell (zsh)                     :", strings.Trim(string(stdout), " \n"))
+
+		cmd = exec.Command("which", "dash")
 		stdout, _ = cmd.Output()
-		fmt.Println(strings.Trim(string(stdout), " \n"))
+		fmt.Println("Debian Almquist Shell (dash)      :", strings.Trim(string(stdout), " \n"))
+
+		cmd = exec.Command("which", "fish")
+		stdout, _ = cmd.Output()
+		fmt.Println("Friendly Interactive Shell (fish) :", strings.Trim(string(stdout), " \n"))
+
 		cmd = exec.Command("which", "ash")
 		stdout, _ = cmd.Output()
-		fmt.Println(strings.Trim(string(stdout), " \n"))
+		fmt.Println("Almquist Shell (ash)              :", strings.Trim(string(stdout), " \n"))
+
 		return
 	}
 
@@ -303,6 +490,12 @@ func main() {
 	if wdErr != nil {
 		log.Println(wdErr)
 		return
+	}
+	if useAnotherPath == nil || *useAnotherPath == "" {
+		env := os.Getenv("NRUNPROJECT")
+		if env != "" {
+			*useAnotherPath = env
+		}
 	}
 	if useAnotherPath != nil && *useAnotherPath != "" {
 		_, _, projects := GetDefaultValues("")

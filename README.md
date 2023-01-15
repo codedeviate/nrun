@@ -43,9 +43,12 @@ and the command that this script runs will be printed out.
   nrun <scriptname> [args]   Run the script by name
   nrun -l                    Shows all available scripts
   nrun                       Shows all available scripts (same as the -l flag)
-  nrun -p <project>          Run the script in the specified projects path
+  nrun -p <project>          Run the script in the specified project path
   nrun -s <scriptname>       Show the script that will be executed without running it
   nrun -h                    Shows help section
+  nrun -lp                   Shows all available projects
+  nrun -ap <project> <path>  Add a project to the list of projects
+  nrun -rp <project>         Remove a project from the list of projects
 ```
 
 ## Installation
