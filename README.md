@@ -158,3 +158,59 @@ This is the same as
 ``` bash
 # > nrun -p /Users/codedeviate/Development/nruntest test
 ```
+
+
+## Different ways to use nrun
+### You want to run a script that is located in another project
+```bash
+# > nrun -p proj1 test
+```
+
+### You have a project that is your main project that you want to use as your default project
+Set the environment variable NRUNPROJECT to the name of the project.
+```bash
+# > nrun test
+```
+This will list all scripts in your default project.
+
+If you have a default project defined but want to use nrun in the local directory you'll have to use the -p flag.
+```bash
+# > nrun -p .
+```
+This will list all scripts in your local directory.
+
+
+## Makefile
+There are some predefined targets in the Makefile that can be used to build and install the tool.
+
+```bash
+# > make local
+```
+This will build the tool and place it in the current directory. It will also cross compile the tool for windows, linux and darwin. These files will be found in the bin directory.
+
+```bash
+# > make util
+```
+This will build the tool and move it to the ~/Utils directory. This is my preferred location for tools I use myself. So if you don't have a ~/Utils directory you'll either have to create it or skip using this target.
+
+The cross compilation will be done for the following platforms:
+* darwin/amd64
+* darwin/arm64
+* linux/amd64
+* linux/arm64
+* windows/amd64
+* windows/arm64
+
+This list is subject to change.
+
+The cross compilations doesn't include any code signing or notarization. So if you want to use the cross compiled binaries on a mac you'll have to sign and notarize them yourself.
+
+```bash
+# > make go
+```
+This will build the tool and move it to the ~/go/bin directory. If you don't have a ~/go/bin directory or you have your go binaries somewhere else you'll either have to create it or skip using this target.
+
+```bash
+# > make all
+```
+This will call all the other targets.
