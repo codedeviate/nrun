@@ -15,19 +15,19 @@ import (
 	"strings"
 )
 
-const version = "0.10.1"
+const version = "0.11.0"
 
 type PackageJSON struct {
-	Name            string            `json:"name"`
-	Version         string            `json:"version"`
-	Description     string            `json:"description"`
-	Main            string            `json:"main"`
-	Scripts         map[string]string `json:"scripts"`
-	Author          string            `json:"author"`
-	License         string            `json:"license"`
-	Dependencies    map[string]string `json:"dependencies"`
-	Nyc             map[string]string `json:"nyc"`
-	DevDependencies map[string]string `json:"devDependencies"`
+	Name            string                 `json:"name"`
+	Version         string                 `json:"version"`
+	Description     string                 `json:"description"`
+	Main            string                 `json:"main"`
+	Scripts         map[string]string      `json:"scripts"`
+	Author          interface{}            `json:"author"`
+	License         string                 `json:"license"`
+	Dependencies    map[string]string      `json:"dependencies"`
+	Nyc             map[string]interface{} `json:"nyc"`
+	DevDependencies map[string]string      `json:"devDependencies"`
 }
 
 type Config struct {
@@ -36,19 +36,31 @@ type Config struct {
 	Projects map[string]string            `json:"projects"`
 }
 
-func ProcessPath(path string) (*PackageJSON, string, error) {
+type LicenseList map[string][]string
+
+func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
+	var maxDepth int
+	if len(maxDepths) == 0 {
+		maxDepth = 100
+	} else {
+		maxDepth = maxDepths[0]
+	}
 	if _, err := os.Stat(path + "/package.json"); errors.Is(err, os.ErrNotExist) {
 		parts := strings.Split(path, "/")
 		parts = parts[:len(parts)-1]
 		path = strings.Join(parts, "/")
-		if len(path) > 0 {
-			return ProcessPath(path)
+		if maxDepth > 0 && len(path) > 0 {
+			return ProcessPath(path, maxDepth-1)
 		}
 		return nil, "", errors.New("no package.json found")
 	}
 	file, _ := os.ReadFile(path + "/package.json")
 	packageJSON := PackageJSON{}
-	_ = json.Unmarshal(file, &packageJSON)
+	err := json.Unmarshal(file, &packageJSON)
+	if err != nil {
+		errorMessage := err.Error()
+		return nil, "", errors.New("Error parsing package.json. " + strings.ToUpper(errorMessage[0:1]) + errorMessage[1:])
+	}
 	return &packageJSON, path, nil
 }
 
@@ -362,13 +374,95 @@ func copyFile(src string, dst string) error {
 	return err
 }
 
+func showLicenseInfo(path string, licenseList LicenseList) LicenseList {
+	if FileExists(path + "/package.json") {
+		packageRaw, err := os.ReadFile(path + "/package.json")
+		if err != nil {
+			log.Println("Failed with", err)
+		} else {
+			packageJSON := PackageJSON{}
+			err := json.Unmarshal(packageRaw, &packageJSON)
+			if err != nil {
+				log.Println("Failed opening package.json with", err)
+			} else {
+				// fmt.Printf("%s version %s, license %s\n", packageJSON.Name, packageJSON.Version, packageJSON.License)
+				if packageJSON.License == "" {
+					packageJSON.License = "UNKNOWN"
+				}
+				foundInLicense := false
+				for _, name := range licenseList[packageJSON.License] {
+					if name == packageJSON.Name {
+						foundInLicense = true
+						break
+					}
+				}
+				if foundInLicense == false {
+					if packageJSON.Name == "" {
+						packageJSON.Name = path
+					}
+					licenseList[packageJSON.License] = append(licenseList[packageJSON.License], packageJSON.Name)
+				}
+			}
+			if FileExists(path + "/node_modules") {
+				files, err := os.ReadDir(path + "/node_modules")
+				if err != nil {
+					log.Println("Failed with", err)
+				} else {
+					for _, file := range files {
+						if file.Name()[0] != '.' {
+							if file.IsDir() {
+								licenseList = showLicenseInfo(path+"/node_modules/"+file.Name(), licenseList)
+							}
+						}
+					}
+				}
+			}
+		}
+	} else {
+		files, err := os.ReadDir(path)
+		if err != nil {
+			log.Println("Failed with", err)
+		} else {
+			for _, file := range files {
+				if file.Name() != "." && file.Name() != ".." {
+					if file.IsDir() {
+						licenseList = showLicenseInfo(path+"/"+file.Name(), licenseList)
+					}
+				}
+			}
+		}
+	}
+	return licenseList
+}
+
+func contains(stringsToSearch []string, key string) bool {
+	for _, stringInList := range stringsToSearch {
+		if strings.ToLower(stringInList) == key {
+			return true
+		}
+	}
+	return false
+}
+
+func wildMatch(stringsToSearch []string, key string) bool {
+	for _, stringInList := range stringsToSearch {
+		match, err := regexp.MatchString(".*"+strings.ToLower(stringInList)+".*", strings.ToLower(key))
+		if match && err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	showScript := flag.Bool("s", false, "Show the script")
 	showHelp := flag.Bool("h", false, "Show help")
 	showList := flag.Bool("l", false, "Show all scripts")
+	showLicense := flag.Bool("L", false, "Show licenses of dependencies")
 	showVersion := flag.Bool("v", false, "Show current version")
 	dummyCode := flag.Bool("d", false, "Exec some development dummy code")
 	useAnotherPath := flag.String("p", "", "Use another path to find the package.json")
+	showCurrentProjectInfo := flag.Bool("i", false, "Show current project info")
 	addProject := flag.Bool("ap", false, "Add a project to the config")
 	removeProject := flag.Bool("rp", false, "Remove a project from the config")
 	listProjects := flag.Bool("lp", false, "List all projects from the config")
@@ -383,46 +477,19 @@ func main() {
 		fmt.Println("Version: ", version)
 		fmt.Println("")
 		fmt.Println("Usage:")
-		fmt.Println("  nrun <script name> [args]       Run the script by name")
-		fmt.Println("  nrun -l                         Shows all available scripts")
-		fmt.Println("  nrun                            Shows all available scripts (same as the -l flag)")
-		fmt.Println("  nrun -s <script name>           Show the script without running it")
-		fmt.Println("  nrun -h                         Shows this help")
-		fmt.Println("  nrun -v                         Shows current version")
-		fmt.Println("  nrun -lp                        List all projects from the config")
-		fmt.Println("  nrun -ap <project name> <path>  Add a project to the config")
-		fmt.Println("  nrun -rp <project name>         Remove a project from the config")
+		fmt.Println("  nrun <script name> [args]         Run the script by name")
+		fmt.Println("  nrun -i                           Show information about the current project")
+		fmt.Println("  nrun -l                           Shows all available scripts")
+		fmt.Println("  nrun                              Shows all available scripts (same as the -l flag)")
+		fmt.Println("  nrun -s <script name>             Show the script without running it")
+		fmt.Println("  nrun -h                           Shows this help")
+		fmt.Println("  nrun -v                           Shows current version")
+		fmt.Println("  nrun -lp                          List all projects from the config")
+		fmt.Println("  nrun -ap <project name> <path>    Add a project to the config")
+		fmt.Println("  nrun -rp <project name>           Remove a project from the config")
+		fmt.Println("  nrun -L ([license name]) (names)  Shows all licenses of dependencies")
 		fmt.Println("")
-		fmt.Println(".nrun.json in home directory")
-		fmt.Println("===========================")
-		fmt.Println("Often used script names can be mapped to other and shorter names in a file called .nrun.ini.")
-		fmt.Println("This file should be placed in either the users home directory or in the same directory as the package.json.")
-		fmt.Println("The format is more or less a standard ini-file. But there is one major difference. Section names can't contain colons and are therefor replaced with underscores.")
-		fmt.Println("The section name is the full pathname of the directory that contains the package.json file.")
-		fmt.Println("The section name must be a full path without any trailing slash.")
-		fmt.Println("Environment variables can be defined by adding \"ENV:\" as a prefix to the sections name.")
-		fmt.Println("These environment variables is not connected to the keys in the same directory but rather to the full script name.")
-		fmt.Println("Global section names are \"*\" for mapping values and \"ENV:*\" for environment values. These values will be overridden by values defined in the specific directory.")
-		fmt.Println("")
-		fmt.Println("Example .nrun.json")
-		fmt.Println("{")
-		fmt.Println("  \"env\": {")
-		fmt.Println("    \"/Users/codedeviate/Development/nruntest\": {")
-		fmt.Println("      \"start:localhost\": \"PORT=3007\"")
-		fmt.Println("    }")
-		fmt.Println("  },")
-		fmt.Println("  \"path\": {")
-		fmt.Println("    \"/Users/codedeviate/Development/nruntest\": {")
-		fmt.Println("      \"start\": \"start:localhost\",")
-		fmt.Println("      \"test\": \"test:localhost:coverage\"")
-		fmt.Println("    }")
-		fmt.Println("  }")
-		fmt.Println("  \"projects\": {")
-		fmt.Println("    \"proj1\": \"/home/username/development/project1\",")
-		fmt.Println("    \"proj2\": \"/home/username/development/project2\"")
-		fmt.Println("  }")
-		fmt.Println("}")
-		fmt.Println("If you are in \"/Users/codedeviate/Development/nruntest\" and execute \"nrun start\" then that will be the same as executing \"PORT=3007 npm run start:localhost\" which is much shorter.")
+		fmt.Println("For more information, see README.md")
 		return
 	}
 
@@ -516,6 +583,38 @@ func main() {
 		if len(defaultValues[script]) > 0 {
 			script = defaultValues[script]
 		}
+	}
+	if *showLicense == true {
+		licenseList := make(map[string][]string, 1000)
+		licenseList = showLicenseInfo(path, licenseList)
+		licenseListKeys := make([]string, 0, len(licenseList))
+		for k := range licenseList {
+			licenseListKeys = append(licenseListKeys, k)
+		}
+		sort.Strings(licenseListKeys)
+		for index, key := range licenseListKeys {
+			values := licenseList[licenseListKeys[index]]
+			if len(args) == 0 || (contains(args, strings.ToLower(key)) || contains(args, "names") || wildMatch(args, key)) {
+				if len(args) == 0 || (len(args) == 1 && contains(args, "names")) || (len(args) > 1 && contains(args, "names") && wildMatch(args, key)) || !contains(args, "names") {
+					fmt.Println(key)
+				}
+				if !contains(args, "names") {
+					licenseListValues := make([]string, 0, len(values))
+					for k := range values {
+						licenseListValues = append(licenseListValues, values[k])
+					}
+					sort.Strings(licenseListValues)
+					for _, license := range licenseListValues {
+						fmt.Println("  ", license)
+					}
+				}
+			}
+		}
+		return
+	}
+	if *showCurrentProjectInfo == true {
+		fmt.Println("Current project is", path)
+		return
 	}
 	if processErr != nil {
 		log.Println(processErr)

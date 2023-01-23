@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.10.1**
+**Current version is v0.11.0**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -42,15 +42,16 @@ and the command that this script runs will be printed out.
 
 ## Usage:
 ```bash
-  nrun <scriptname> [args]   Run the script by name
-  nrun -l                    Shows all available scripts
-  nrun                       Shows all available scripts (same as the -l flag)
-  nrun -p <project>          Run the script in the specified project path
-  nrun -s <scriptname>       Show the script that will be executed without running it
-  nrun -h                    Shows help section
-  nrun -lp                   Shows all available projects
-  nrun -ap <project> <path>  Add a project to the list of projects
-  nrun -rp <project>         Remove a project from the list of projects
+  nrun <scriptname> [args]          Run the script by name
+  nrun -l                           Shows all available scripts
+  nrun                              Shows all available scripts (same as the -l flag)
+  nrun -p <project>                 Run the script in the specified project path
+  nrun -s <scriptname>              Show the script that will be executed without running it
+  nrun -h                           Shows help section
+  nrun -lp                          Shows all available projects
+  nrun -ap <project> <path>         Add a project to the list of projects
+  nrun -rp <project>                Remove a project from the list of projects
+  nrun -L ([license name]) (names)  Shows the licenses for the project
 ```
 
 ## Installation
@@ -216,3 +217,45 @@ This will build the tool and move it to the ~/go/bin directory. If you don't hav
 # > make all
 ```
 This will create all the targets.
+
+## Show licenses
+To show the licenses for the project you can use the -L flag.
+
+This will only work with NodeJS projects since the license is read from the package.json files in the node_modules directory.
+
+Filtering can be done by adding the name, or a part of the name, of the license as a parameter.
+You can use multiple parameters to filter the licenses.
+
+The filter is case-insensitive and will match if the parameter is a substring of the license.
+
+To show the name of all licenses for the project you can use the -L flag with "names" as the parameter
+.
+```bash
+# > nrun -L
+```
+This will show the packages licenses for the project.
+
+```bash
+# > nrun -L MIT
+```
+This will show the packages that are under the MIT license.
+
+```bash
+# > nrun -L MIT ISC
+```
+This will show the packages that are under the MIT or ISC license.
+
+```bash
+# > nrun -L names
+```
+This will show the license names that are used by packages in the project.
+
+```bash
+# > nrun -L bs
+```
+The search is case-insensitive and searches for substrings so this will show the packages that are under the different BSD license.
+
+Such as
+* 0BSD
+* BSD-2-Clause
+* BSD-3-Clause

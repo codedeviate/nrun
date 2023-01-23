@@ -8,6 +8,10 @@
         "build-all": "make all",
         "build-local": "make local",
         "build-util": "make util",
-        "hello": "./nrun hello"
+        "hello": "./nrun hello",
+        "test": "go test ./...",
+        "test-verbose": "go test -v ./...",
+        "test-coverage": "go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out",
+        "test-coverage-verbose": "go test -v -coverprofile=coverage.out ./... && go tool cover -html=coverage.out"
     }
 }
