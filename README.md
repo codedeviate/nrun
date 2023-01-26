@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.11.0**
+**Current version is v0.12.0**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -22,7 +22,7 @@ every time you want to run your tests. Then it would be easier to use nrun and t
 ``` bash
 # > nrun test:coverage:localhost
 ```
-And by using shortcuts in .nrun.ini you might shorten this even more to
+And by using shortcuts in .nrun.json you might shorten this even more to
 ``` bash
 # > nrun test
 ```
@@ -52,6 +52,7 @@ and the command that this script runs will be printed out.
   nrun -ap <project> <path>         Add a project to the list of projects
   nrun -rp <project>                Remove a project from the list of projects
   nrun -L ([license name]) (names)  Shows the licenses for the project
+  nrun -V                           Shows all environment variables set by nrun
 ```
 
 ## Installation
@@ -63,7 +64,7 @@ and the command that this script runs will be printed out.
 ```
 
 ### Dependencies
-There is currently no dependencies for this tool.
+There is currently no dependencies for this tool (other than the need for [GoLang](https://go.dev/) to build it).
 * ~~[gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1)~~
 
 ## .nrun.json
@@ -259,3 +260,21 @@ Such as
 * 0BSD
 * BSD-2-Clause
 * BSD-3-Clause
+
+## Fallback to npm
+If the script is not found in the package.json file then nrun will try a fallback to npm.
+
+The following npm commands are passed along to npm:
+>    access, adduser, audit, bin, bugs, cache, ci, completion,
+>    config, dedupe, deprecate, diff, dist-tag, docs, doctor,
+>    edit, exec, explain, explore, find-dupes, fund, get, help,
+>    hook, init, install, install-ci-test, install-test, link,
+>    ll, login, logout, ls, org, outdated, owner, pack, ping,
+>    pkg, prefix, profile, prune, publish, rebuild, repo,
+>    restart, root, run-script, search, set, set-script,
+>    shrinkwrap, star, stars, start, stop, team, test, token,
+>    uninstall, unpublish, unstar, update, version, view, whoami
+
+Please note that not all of these commands are supported by nrun. This is because nrun is not a replacement for npm. It is a tool to make it easier to run scripts in your project.
+
+One major difference is that nrun requires there to be a package.json present in the project. This is because nrun uses the package.json file to find the scripts to run. Fallback to npm will not work if there is no package.json file.

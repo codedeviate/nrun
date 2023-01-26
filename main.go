@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-const version = "0.11.0"
+const version = "0.12.0"
 
 type PackageJSON struct {
 	Name            string                 `json:"name"`
@@ -64,7 +64,7 @@ func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
 	return &packageJSON, path, nil
 }
 
-func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string) {
+func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string, beVerbose bool) {
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
 			runscript := packageJSON.Scripts[script]
@@ -84,6 +84,11 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 			cmd := exec.Command(shell, args...)
 
 			if len(envs[script]) > 0 {
+				if beVerbose {
+					fmt.Println("====================")
+					fmt.Println("Adding environment", envs[script])
+					fmt.Println("====================")
+				}
 				cmd.Env = append(cmd.Environ(), envs[script])
 			}
 			scriptNice := strings.Replace(script, ":", "_", -1)
@@ -100,7 +105,97 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 				return
 			}
 		} else {
-			log.Printf("Can't find any script called \"%s\"\n", script)
+			// Script names that are valid commands in npm
+			validScripts := []string{
+				"access",
+				"adduser",
+				"audit",
+				"bin",
+				"bugs",
+				"cache",
+				"ci",
+				"completion",
+				"config",
+				"dedupe",
+				"deprecate",
+				"diff",
+				"dist-tag",
+				"docs",
+				"doctor",
+				"edit",
+				"exec",
+				"explain",
+				"explore",
+				"find-dupes",
+				"fund",
+				"get",
+				"help",
+				"hook",
+				"init",
+				"install",
+				"install-ci-test",
+				"install-test",
+				"link",
+				"ll",
+				"login",
+				"logout",
+				"ls",
+				"org",
+				"outdated",
+				"owner",
+				"pack",
+				"ping",
+				"pkg",
+				"prefix",
+				"profile",
+				"prune",
+				"publish",
+				"rebuild",
+				"repo",
+				"restart",
+				"root",
+				"run-script",
+				"search",
+				"set",
+				"set-script",
+				"shrinkwrap",
+				"star",
+				"stars",
+				"start",
+				"stop",
+				"team",
+				"test",
+				"token",
+				"uninstall",
+				"unpublish",
+				"unstar",
+				"update",
+				"version",
+				"view",
+				"whoami",
+			}
+			if contains(validScripts, script) {
+				scriptArgs := []string{script}
+				args = append(scriptArgs, args...)
+				cmd := exec.Command("npm", args...)
+				cmd.Stdout = os.Stdout
+				cmd.Stdin = os.Stdin
+				cmd.Stderr = os.Stderr
+				if script != "version" {
+					fmt.Println("========================================")
+					fmt.Println("Running \x1b[34mnpm", strings.Join(args[:], " "), "\x1b[0m")
+					fmt.Println("========================================")
+				} else {
+					fmt.Printf("nrun: {\n  nrun: '%s'\n},\nnpm: ", version)
+				}
+				runErr := cmd.Run()
+				if runErr != nil {
+					log.Println(runErr)
+					return
+				}
+			} else {
+				log.Println("Script", script, "does not exist")
+			}
 		}
 	}
 }
@@ -466,6 +561,7 @@ func main() {
 	addProject := flag.Bool("ap", false, "Add a project to the config")
 	removeProject := flag.Bool("rp", false, "Remove a project from the config")
 	listProjects := flag.Bool("lp", false, "List all projects from the config")
+	beVerbose := flag.Bool("V", false, "Be verbose, shows all environment variables set by nrun")
 
 	flag.Parse()
 
@@ -488,6 +584,7 @@ func main() {
 		fmt.Println("  nrun -ap <project name> <path>    Add a project to the config")
 		fmt.Println("  nrun -rp <project name>           Remove a project from the config")
 		fmt.Println("  nrun -L ([license name]) (names)  Shows all licenses of dependencies")
+		fmt.Println("  nrun -V                           Shows all environment variables set by nrun")
 		fmt.Println("")
 		fmt.Println("For more information, see README.md")
 		return
@@ -624,7 +721,7 @@ func main() {
 		} else if *showScript == true {
 			ShowScript(*packageJSON, script)
 		} else {
-			RunNPM(*packageJSON, script, args[1:], defaultEnvironment)
+			RunNPM(*packageJSON, script, args[1:], defaultEnvironment, *beVerbose)
 		}
 	}
 }
