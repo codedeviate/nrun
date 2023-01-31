@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.12.0**
+**Current version is v0.12.1**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -54,6 +54,37 @@ and the command that this script runs will be printed out.
   nrun -L ([license name]) (names)  Shows the licenses for the project
   nrun -V                           Shows all environment variables set by nrun
 ```
+
+## Flags
+
+### -l
+Shows all available scripts. This is the same as just typing nrun. It will show all scripts in the current project.
+
+The equivalent of this in npm is to type *npm run*.
+
+### -p
+Run the script in the specified project path. The project-name given is first checked against all registered projects in the global .nrun.json file. If no match is found then the project-name is assumed to be a path and the script will be run in that path.
+
+### -s
+Show the script that will be executed without running it. This is useful if you want to see what a script does before running it. 
+
+### -h
+Shows help section. 
+
+### -lp
+Shows all available projects defined in the global .nrun.json file.
+
+### -ap
+Add a project to the list of projects in the global .nrun.json file. The project-name given is first checked against all registered projects in the global .nrun.json file.
+
+### -rp
+Remove a project from the list of projects in the global .nrun.json file.
+
+### -L
+Shows the licenses for the project and its dependencies. If no arguments are given then the licenses for the project will be shown. If a license name is given then the licenses for the dependencies that have that license will be shown. If a list of names are given then the licenses for the dependencies that have one of those licenses will be shown.
+
+### -V
+Shows all environment variables set by nrun and their values. This is useful if you want to see what environment variables are set by nrun and what values they have.
 
 ## Installation
 ```bash
@@ -277,4 +308,4 @@ The following npm commands are passed along to npm:
 
 Please note that not all of these commands are supported by nrun. This is because nrun is not a replacement for npm. It is a tool to make it easier to run scripts in your project.
 
-One major difference is that nrun requires there to be a package.json present in the project. This is because nrun uses the package.json file to find the scripts to run. Fallback to npm will not work if there is no package.json file.
+Since nrun uses flags to specify the project and the script to run it is not possible to use flags such as the -h flag to get help for the npm commands.

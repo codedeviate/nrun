@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,11 +13,13 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 )
 
-const version = "0.12.0"
+const version = "0.12.1"
 
 type PackageJSON struct {
 	Name            string                 `json:"name"`
@@ -37,6 +41,22 @@ type Config struct {
 }
 
 type LicenseList map[string][]string
+type FlagList struct {
+	showScript             bool
+	showHelp               bool
+	showList               bool
+	showLicense            bool
+	showVersion            bool
+	dummyCode              bool
+	useAnotherPath         string
+	showCurrentProjectInfo bool
+	addProject             bool
+	removeProject          bool
+	listProjects           bool
+	beVerbose              bool
+	passthruNpm            bool
+	systemInfo             bool
+}
 
 func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
 	var maxDepth int
@@ -64,7 +84,7 @@ func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
 	return &packageJSON, path, nil
 }
 
-func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string, beVerbose bool) {
+func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string, flagList FlagList) {
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
 			runscript := packageJSON.Scripts[script]
@@ -84,7 +104,7 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 			cmd := exec.Command(shell, args...)
 
 			if len(envs[script]) > 0 {
-				if beVerbose {
+				if flagList.beVerbose {
 					fmt.Println("====================")
 					fmt.Println("Adding environment", envs[script])
 					fmt.Println("====================")
@@ -105,99 +125,109 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 				return
 			}
 		} else {
-			// Script names that are valid commands in npm
-			validScripts := []string{
-				"access",
-				"adduser",
-				"audit",
-				"bin",
-				"bugs",
-				"cache",
-				"ci",
-				"completion",
-				"config",
-				"dedupe",
-				"deprecate",
-				"diff",
-				"dist-tag",
-				"docs",
-				"doctor",
-				"edit",
-				"exec",
-				"explain",
-				"explore",
-				"find-dupes",
-				"fund",
-				"get",
-				"help",
-				"hook",
-				"init",
-				"install",
-				"install-ci-test",
-				"install-test",
-				"link",
-				"ll",
-				"login",
-				"logout",
-				"ls",
-				"org",
-				"outdated",
-				"owner",
-				"pack",
-				"ping",
-				"pkg",
-				"prefix",
-				"profile",
-				"prune",
-				"publish",
-				"rebuild",
-				"repo",
-				"restart",
-				"root",
-				"run-script",
-				"search",
-				"set",
-				"set-script",
-				"shrinkwrap",
-				"star",
-				"stars",
-				"start",
-				"stop",
-				"team",
-				"test",
-				"token",
-				"uninstall",
-				"unpublish",
-				"unstar",
-				"update",
-				"version",
-				"view",
-				"whoami",
-			}
-			if contains(validScripts, script) {
-				scriptArgs := []string{script}
-				args = append(scriptArgs, args...)
-				cmd := exec.Command("npm", args...)
-				cmd.Stdout = os.Stdout
-				cmd.Stdin = os.Stdin
-				cmd.Stderr = os.Stderr
-				if script != "version" {
-					fmt.Println("========================================")
-					fmt.Println("Running \x1b[34mnpm", strings.Join(args[:], " "), "\x1b[0m")
-					fmt.Println("========================================")
-				} else {
-					fmt.Printf("nrun: {\n  nrun: '%s'\n},\nnpm: ", version)
-				}
-				runErr := cmd.Run()
-				if runErr != nil {
-					log.Println(runErr)
-					return
-				}
-			} else {
+			if PassthruNpm(packageJSON, script, args, envs) == false {
 				log.Println("Script", script, "does not exist")
 			}
 		}
+	} else {
+		if PassthruNpm(packageJSON, script, args, envs) == false {
+			log.Println("No scripts defined in package.json")
+		}
 	}
+}
+
+func PassthruNpm(packageJSON PackageJSON, script string, args []string, envs map[string]string) bool {
+	// Script names that are valid commands in npm
+	validScripts := []string{
+		"access",
+		"adduser",
+		"audit",
+		"bin",
+		"bugs",
+		"cache",
+		"ci",
+		"completion",
+		"config",
+		"dedupe",
+		"deprecate",
+		"diff",
+		"dist-tag",
+		"docs",
+		"doctor",
+		"edit",
+		"exec",
+		"explain",
+		"explore",
+		"find-dupes",
+		"fund",
+		"get",
+		"help",
+		"hook",
+		"init",
+		"install",
+		"install-ci-test",
+		"install-test",
+		"link",
+		"ll",
+		"login",
+		"logout",
+		"ls",
+		"org",
+		"outdated",
+		"owner",
+		"pack",
+		"ping",
+		"pkg",
+		"prefix",
+		"profile",
+		"prune",
+		"publish",
+		"rebuild",
+		"repo",
+		"restart",
+		"root",
+		"run-script",
+		"search",
+		"set",
+		"set-script",
+		"shrinkwrap",
+		"star",
+		"stars",
+		"start",
+		"stop",
+		"team",
+		"test",
+		"token",
+		"uninstall",
+		"unpublish",
+		"unstar",
+		"update",
+		"version",
+		"view",
+		"whoami",
+	}
+	if len(script) == 0 || contains(validScripts, script) {
+		scriptArgs := []string{script}
+		args = append(scriptArgs, args...)
+		cmd := exec.Command("npm", args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+		if script != "version" {
+			fmt.Println("========================================")
+			fmt.Println("Running \x1b[34mnpm", strings.Join(args[:], " "), "\x1b[0m")
+			fmt.Println("========================================")
+		} else {
+			fmt.Printf("nrun: {\n  nrun: '%s'\n},\nnpm: ", version)
+		}
+		runErr := cmd.Run()
+		if runErr != nil {
+			log.Println(runErr)
+			return true
+		}
+		return true
+	}
+	return false
 }
 
 func ShowScripts(packageJSON PackageJSON, defaultValues map[string]string, defaultEnvironment map[string]string) {
@@ -549,23 +579,161 @@ func wildMatch(stringsToSearch []string, key string) bool {
 	return false
 }
 
+func GetVersionFromExecutable(executable string, args []string) string {
+	cmd := exec.Command(executable, args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out.String())
+}
+
+type Memory struct {
+	MemTotal     int
+	MemFree      int
+	MemAvailable int
+}
+
+func parseLine(raw string) (key string, value int) {
+	fmt.Println(raw)
+	text := strings.ReplaceAll(raw[:len(raw)-2], " ", "")
+	keyValue := strings.Split(text, ":")
+	intValue, _ := strconv.Atoi(keyValue[1])
+	return keyValue[0], intValue * 1
+}
+
+func ReadMemoryStats() Memory {
+	file, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return Memory{}
+	}
+	defer file.Close()
+	bufio.NewScanner(file)
+	scanner := bufio.NewScanner(file)
+	res := Memory{}
+	for scanner.Scan() {
+		key, value := parseLine(scanner.Text())
+		switch key {
+		case "MemTotal":
+			res.MemTotal = value
+		case "MemFree":
+			res.MemFree = value
+		case "MemAvailable":
+			res.MemAvailable = value
+		}
+	}
+	return res
+}
+
+func SystemInfo() {
+	fmt.Println("System information:")
+	fmt.Println("  OS:", runtime.GOOS)
+	if kernelVersion := GetVersionFromExecutable("uname", []string{"-r"}); version != "" {
+		fmt.Println("  Kernel:", kernelVersion)
+	}
+	fmt.Println("  Architecture:", runtime.GOARCH)
+
+	memory := ReadMemoryStats()
+	if memory.MemTotal > 0 {
+		fmt.Println("  Total memory:", memory.MemTotal/1024, "MB")
+	}
+	if memory.MemFree > 0 {
+		fmt.Println("  Free memory:", memory.MemFree/1024, "MB")
+	}
+	if memory.MemAvailable > 0 {
+		fmt.Println("  Available memory:", memory.MemAvailable/1024, "MB")
+	}
+
+	var version string
+	fmt.Println("  Versions of installed tools:")
+	if version = GetVersionFromExecutable("git", []string{"--version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`git\s+version\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Git:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("nrun", []string{"-v"}); version != "" {
+		fmt.Println("    nrun:", version)
+	}
+	if version = GetVersionFromExecutable("node", []string{"-v"}); version != "" {
+		fmt.Println("    Node:", version)
+	}
+	if version = GetVersionFromExecutable("npm", []string{"-v"}); version != "" {
+		fmt.Println("    NPM:", version)
+	}
+	if version = GetVersionFromExecutable("go", []string{"version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`go\s+version\s+go([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Go:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("php", []string{"-v"}); version != "" {
+		cleanVersion := regexp.MustCompile(`PHP\s+([0-9\.]+)\s+`).FindStringSubmatch(version)
+		fmt.Println("    PHP:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("python3", []string{"--version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`Python\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Python3:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("ruby", []string{"-v"}); version != "" {
+		cleanVersion := regexp.MustCompile(`ruby\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Ruby:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("gcc", []string{"--version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`clang\s+version\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    GCC:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("make", []string{"-v"}); version != "" {
+		cleanVersion := regexp.MustCompile(`Make\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Make:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("ldd", []string{"--version"}); version != "" {
+		fmt.Println("    LDD:", version)
+	}
+	if version = GetVersionFromExecutable("zig", []string{"version"}); version != "" {
+		fmt.Println("    Zig:", version)
+	}
+	if version = GetVersionFromExecutable("bun", []string{"--version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`bun\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Bun:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("deno", []string{"--version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`deno\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Deno:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("rustc", []string{"--version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`rustc\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Rust:", cleanVersion[1])
+	}
+	if version = GetVersionFromExecutable("cargo", []string{"--version"}); version != "" {
+		cleanVersion := regexp.MustCompile(`cargo\s+([0-9\.]+)`).FindStringSubmatch(version)
+		fmt.Println("    Cargo:", cleanVersion[1])
+	}
+	fmt.Println("\nVersion information brought to you by nrun.")
+}
+
 func main() {
-	showScript := flag.Bool("s", false, "Show the script")
-	showHelp := flag.Bool("h", false, "Show help")
-	showList := flag.Bool("l", false, "Show all scripts")
-	showLicense := flag.Bool("L", false, "Show licenses of dependencies")
-	showVersion := flag.Bool("v", false, "Show current version")
-	dummyCode := flag.Bool("d", false, "Exec some development dummy code")
-	useAnotherPath := flag.String("p", "", "Use another path to find the package.json")
-	showCurrentProjectInfo := flag.Bool("i", false, "Show current project info")
-	addProject := flag.Bool("ap", false, "Add a project to the config")
-	removeProject := flag.Bool("rp", false, "Remove a project from the config")
-	listProjects := flag.Bool("lp", false, "List all projects from the config")
-	beVerbose := flag.Bool("V", false, "Be verbose, shows all environment variables set by nrun")
+	flagList := FlagList{}
+	flagList.showScript = *flag.Bool("s", false, "Show the script")
+	flagList.showHelp = *flag.Bool("h", false, "Show help")
+	flagList.showList = *flag.Bool("l", false, "Show all scripts")
+	flagList.showLicense = *flag.Bool("L", false, "Show licenses of dependencies")
+	flagList.showVersion = *flag.Bool("v", false, "Show current version")
+	flagList.dummyCode = *flag.Bool("d", false, "Exec some development dummy code")
+	flagList.useAnotherPath = *flag.String("p", "", "Use another path to find the package.json")
+	flagList.showCurrentProjectInfo = *flag.Bool("i", false, "Show current project info")
+	flagList.addProject = *flag.Bool("ap", false, "Add a project to the config")
+	flagList.removeProject = *flag.Bool("rp", false, "Remove a project from the config")
+	flagList.listProjects = *flag.Bool("lp", false, "List all projects from the config")
+	flagList.beVerbose = *flag.Bool("V", false, "Be verbose, shows all environment variables set by nrun")
+	flagList.passthruNpm = *flag.Bool("n", false, "Pass through to npm")
+	flagList.systemInfo = *flag.Bool("I", false, "Get the system information")
 
 	flag.Parse()
 
-	if *showHelp == true {
+	if flagList.systemInfo {
+		SystemInfo()
+		return
+	}
+	if flagList.showHelp == true {
 		fmt.Println("nrun - The npm script runner")
 		fmt.Println("============================")
 		fmt.Println("nrun will lookup the package.json used by the current project and execute the named script found in the scripts section of the package.json.")
@@ -574,6 +742,7 @@ func main() {
 		fmt.Println("")
 		fmt.Println("Usage:")
 		fmt.Println("  nrun <script name> [args]         Run the script by name")
+		fmt.Println("  nrun -n                           Pass through to npm. Send everything to npm and let it handle it.")
 		fmt.Println("  nrun -i                           Show information about the current project")
 		fmt.Println("  nrun -l                           Shows all available scripts")
 		fmt.Println("  nrun                              Shows all available scripts (same as the -l flag)")
@@ -585,24 +754,24 @@ func main() {
 		fmt.Println("  nrun -rp <project name>           Remove a project from the config")
 		fmt.Println("  nrun -L ([license name]) (names)  Shows all licenses of dependencies")
 		fmt.Println("  nrun -V                           Shows all environment variables set by nrun")
-		fmt.Println("")
+		fmt.Println("  nrun -nv <node version>           Use a specific node version")
 		fmt.Println("For more information, see README.md")
 		return
 	}
 
-	if *listProjects == true {
+	if flagList.listProjects == true {
 		listProjectsFromConfig()
 		return
 	}
-	if *addProject == true {
+	if flagList.addProject == true {
 		addProjectToConfig(flag.Args())
 		return
 	}
-	if *removeProject == true {
+	if flagList.removeProject == true {
 		removeProjectFromConfig(flag.Args())
 		return
 	}
-	if *dummyCode == true {
+	if flagList.dummyCode == true {
 		fmt.Println("Dummy code that outputs the path to different shells if they are found")
 
 		cmd := exec.Command("which", "sh")
@@ -640,7 +809,7 @@ func main() {
 		return
 	}
 
-	if *showVersion == true {
+	if flagList.showVersion == true {
 		fmt.Println(version)
 		return
 	}
@@ -655,15 +824,15 @@ func main() {
 		log.Println(wdErr)
 		return
 	}
-	if useAnotherPath == nil || *useAnotherPath == "" {
+	if flagList.useAnotherPath == "" {
 		env := os.Getenv("NRUNPROJECT")
 		if env != "" {
-			*useAnotherPath = env
+			flagList.useAnotherPath = env
 		}
 	}
-	if useAnotherPath != nil && *useAnotherPath != "" {
+	if flagList.useAnotherPath != "" {
 		_, _, projects := GetDefaultValues("")
-		path = *useAnotherPath
+		path = flagList.useAnotherPath
 		if _, ok := projects[path]; ok {
 			path = projects[path]
 		}
@@ -676,12 +845,24 @@ func main() {
 	packageJSON, path, processErr := ProcessPath(path)
 	defaultValues, defaultEnvironment, _ := GetDefaultValues(path)
 
+	if processErr != nil {
+		if packageJSON == nil {
+			packageJSON = &PackageJSON{}
+		}
+		if len(args) > 0 {
+			args = args[1:]
+		}
+		if PassthruNpm(*packageJSON, script, args, defaultEnvironment) == false {
+			fmt.Println(processErr)
+		}
+		return
+	}
 	if defaultValues != nil {
 		if len(defaultValues[script]) > 0 {
 			script = defaultValues[script]
 		}
 	}
-	if *showLicense == true {
+	if flagList.showLicense == true {
 		licenseList := make(map[string][]string, 1000)
 		licenseList = showLicenseInfo(path, licenseList)
 		licenseListKeys := make([]string, 0, len(licenseList))
@@ -709,19 +890,20 @@ func main() {
 		}
 		return
 	}
-	if *showCurrentProjectInfo == true {
+	if flagList.showCurrentProjectInfo == true {
 		fmt.Println("Current project is", path)
 		return
 	}
 	if processErr != nil {
 		log.Println(processErr)
 	} else {
-		if len(args) == 0 || *showList == true {
+		if len(args) == 0 || flagList.showList == true {
 			ShowScripts(*packageJSON, defaultValues, defaultEnvironment)
-		} else if *showScript == true {
+		} else if flagList.showScript == true {
 			ShowScript(*packageJSON, script)
 		} else {
-			RunNPM(*packageJSON, script, args[1:], defaultEnvironment, *beVerbose)
+			RunNPM(*packageJSON, script, args[1:], defaultEnvironment, flagList)
 		}
 	}
+
 }
