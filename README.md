@@ -53,6 +53,9 @@ and the command that this script runs will be printed out.
   nrun -rp <project>                Remove a project from the list of projects
   nrun -L ([license name]) (names)  Shows the licenses for the project
   nrun -V                           Shows all environment variables set by nrun
+  nrun -e <command>                 Execute a command in the current shell
+  nrun -x                           Execute a defined nrun script
+  nrun -T                           Measure the time it takes to run a script
 ```
 
 ## Flags
@@ -85,6 +88,51 @@ Shows the licenses for the project and its dependencies. If no arguments are giv
 
 ### -V
 Shows all environment variables set by nrun and their values. This is useful if you want to see what environment variables are set by nrun and what values they have.
+
+### -e
+Execute a command in the current directory.
+This is useful if you want to execute a command.
+The command will be executed in a shell and the output will be printed to the terminal.
+The command will be executed in a subshell.
+
+If the command requires flags then add -- before the command.
+
+This flag can be used together with the -p flag making it possible to execute a command in a specific project.
+
+### -ep
+Execute a command in all defined projects.
+This is useful if you want to execute a command all projects.
+The command will be executed in a shell and the output will be printed to the terminal.
+The command will be executed in a subshell.
+
+If the command requires flags then add -- before the command.
+
+### -x
+Execute a defined nrun script.
+This is useful if you want to execute multiple commands.
+The commands don't have to be related to npm scripts.
+Scripts will be executed in separate shells and the output will be printed to the terminal.
+
+Flags and parameters can't be forwarded to the scripts.
+
+### -lx
+List all defined nrun scripts.
+
+### -T
+Measure the time it takes to run a script.
+
+The time will be printed to the terminal when the script has finished.
+
+| Time spent              | Format | Example |
+|-------------------------|--------|---------|
+| 1 minute ->             | Xm Ys  | 2m 13s  |
+| 10 seconds - 1 minute   | X.Ys   | 36.1s   |
+| 5 seconds - 10 seconds  | X.YYs  | 6.23s   |
+| 1 second - 5 seconds    | X.YYYs | 2.152s  |
+| 0.02 seconds - 1 second | Xms    | 657ms   |
+| 20ms - 0.02 seconds     | Xus    | 1220us  |
+| 0 -> 20ms               | Xns    | 16922ns |
+
 
 ## Installation
 ```bash
@@ -214,6 +262,17 @@ If you have a default project defined but want to use nrun in the local director
 ```
 This will list all scripts in your local directory.
 
+If you want to execute a command in another project you can use the -e flag and the -p flag.
+```bash
+# > nrun -p proj1 -e ls
+```
+This will list all files in the proj1 directory.
+
+Or a more realistic example.
+```bash
+# > nrun -p proj1 -e -- git commit -am "Some commit message"
+```
+This will commit all changes in the proj1 directory.
 
 ## Makefile
 There are some predefined targets in the Makefile that can be used to build and install the tool.

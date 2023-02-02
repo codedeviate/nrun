@@ -17,9 +17,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
-const version = "0.12.1"
+const version = "0.14.0"
 
 type PackageJSON struct {
 	Name            string                 `json:"name"`
@@ -38,24 +39,33 @@ type Config struct {
 	Env      map[string]map[string]string `json:"env"`
 	Path     map[string]map[string]string `json:"path"`
 	Projects map[string]string            `json:"projects"`
+	Scripts  map[string][]string          `json:"scripts"`
 }
 
 type LicenseList map[string][]string
 type FlagList struct {
-	showScript             bool
-	showHelp               bool
-	showList               bool
-	showLicense            bool
-	showVersion            bool
-	dummyCode              bool
-	useAnotherPath         string
-	showCurrentProjectInfo bool
-	addProject             bool
-	removeProject          bool
-	listProjects           bool
-	beVerbose              bool
-	passthruNpm            bool
-	systemInfo             bool
+	showScript               *bool
+	showHelp                 *bool
+	showList                 *bool
+	showLicense              *bool
+	showVersion              *bool
+	dummyCode                *bool
+	useAnotherPath           *string
+	usedPath                 string
+	showCurrentProjectInfo   *bool
+	addProject               *bool
+	removeProject            *bool
+	listProjects             *bool
+	beVerbose                *bool
+	passthruNpm              *bool
+	systemInfo               *bool
+	executeCommand           *bool
+	executeCommandInProjects *bool
+	executeScript            *bool
+	listExecutableScripts    *bool
+	addExecutableScript      *bool
+	removeExecutableScript   *bool
+	measureTime              *bool
 }
 
 func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
@@ -84,7 +94,7 @@ func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
 	return &packageJSON, path, nil
 }
 
-func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string, flagList FlagList) {
+func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string, flagList *FlagList) {
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
 			runscript := packageJSON.Scripts[script]
@@ -104,10 +114,22 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 			cmd := exec.Command(shell, args...)
 
 			if len(envs[script]) > 0 {
-				if flagList.beVerbose {
-					fmt.Println("====================")
-					fmt.Println("Adding environment", envs[script])
-					fmt.Println("====================")
+				if *flagList.beVerbose {
+					fmt.Println("============================================================")
+					fmt.Println("Adding environment:", envs[script])
+					if flagList.usedPath != "" {
+						fmt.Println("Using path:", flagList.usedPath)
+					}
+					fmt.Println("============================================================")
+				}
+				cmd.Env = append(cmd.Environ(), envs[script])
+			} else {
+				if *flagList.beVerbose {
+					if flagList.usedPath != "" {
+						fmt.Println("============================================================")
+						fmt.Println("Using path:", flagList.usedPath)
+						fmt.Println("============================================================")
+					}
 				}
 				cmd.Env = append(cmd.Environ(), envs[script])
 			}
@@ -301,10 +323,11 @@ func GetShell() (string, error) {
 	return "", errors.New("can't find any shell")
 }
 
-func GetDefaultValues(path string) (map[string]string, map[string]string, map[string]string) {
+func GetDefaultValues(path string) (map[string]string, map[string]string, map[string]string, map[string][]string) {
 	defaults := make(map[string]string, 1000)
 	defaultEnvs := make(map[string]string, 1000)
 	projects := make(map[string]string, 1000)
+	scripts := make(map[string][]string, 1000)
 	usr, _ := user.Current()
 	dir := usr.HomeDir
 	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
@@ -331,11 +354,14 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 			for k, v := range config.Projects {
 				projects[k] = v
 			}
+			for k, v := range config.Scripts {
+				scripts[k] = v
+			}
 		}
 	}
 
 	if path == "" {
-		return defaults, defaultEnvs, projects
+		return defaults, defaultEnvs, projects, scripts
 	}
 	if _, err := os.Stat("./.nrun.json"); !errors.Is(err, os.ErrNotExist) {
 		jsonFile, err := os.Open("./.nrun.json")
@@ -361,7 +387,7 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 		}
 	}
 
-	return defaults, defaultEnvs, projects
+	return defaults, defaultEnvs, projects, scripts
 }
 
 func addProjectToConfig(args []string) {
@@ -381,7 +407,7 @@ func addProjectToConfig(args []string) {
 				log.Println("Failed with", err)
 			} else {
 				projPath := args[1]
-				if projPath[0:2] == ".." {
+				if len(projPath) > 1 && projPath[0:2] == ".." {
 					cwd, _ := os.Getwd()
 					projPath = cwd + "/" + projPath
 				} else if projPath[0] == '.' {
@@ -710,30 +736,118 @@ func SystemInfo() {
 	fmt.Println("\nVersion information brought to you by nrun.")
 }
 
+func ExecuteCommand(path string, script string, args []string, defaultValues map[string]string, defaultEnvironment map[string]string, flagList *FlagList) {
+	if len(script) == 0 {
+		log.Println("No command given.")
+		return
+	}
+	if len(args) > 0 && args[0] == "--" {
+		if len(args) > 1 {
+			args = args[1:]
+		} else {
+			args = []string{}
+		}
+	}
+
+	if flagList.beVerbose != nil && *flagList.beVerbose {
+		fmt.Println("Executing command:", script, strings.Join(args, " "), "in", path)
+	}
+	os.Chdir(path)
+	cmd := exec.Command(script, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	cmd.Run()
+	return
+}
+
+func ExecuteScripts(path string, scripts []string, args []string) {
+	fmt.Println("================================================================================")
+	fmt.Println("Warning: Executing script is currently an experimental work in progress.")
+	fmt.Println("This feature might be removed in the future without prior notice.")
+	fmt.Println("Please use at your own risk.")
+	fmt.Println("Do not report issues about this feature. Unless you are willing to fix them.")
+	fmt.Println("DO NOT USE THIS FEATURE IN PRODUCTION ENVIRONMENTS.")
+	fmt.Println("================================================================================")
+	fmt.Println("")
+	if len(scripts) > 0 {
+		os.Chdir(path)
+		for _, script := range scripts {
+			shell, shellErr := GetShell()
+			if shellErr != nil {
+				fmt.Println("Error:", shellErr)
+				return
+			}
+			cmd := exec.Command(shell, append([]string{"-c", script})...)
+
+			cmd.Stdout = os.Stdout
+			cmd.Stdin = os.Stdin
+			cmd.Stderr = os.Stderr
+
+			runErr := cmd.Run()
+			if runErr != nil {
+				log.Println(runErr)
+				return
+			}
+		}
+	}
+}
+
 func main() {
-	flagList := FlagList{}
-	flagList.showScript = *flag.Bool("s", false, "Show the script")
-	flagList.showHelp = *flag.Bool("h", false, "Show help")
-	flagList.showList = *flag.Bool("l", false, "Show all scripts")
-	flagList.showLicense = *flag.Bool("L", false, "Show licenses of dependencies")
-	flagList.showVersion = *flag.Bool("v", false, "Show current version")
-	flagList.dummyCode = *flag.Bool("d", false, "Exec some development dummy code")
-	flagList.useAnotherPath = *flag.String("p", "", "Use another path to find the package.json")
-	flagList.showCurrentProjectInfo = *flag.Bool("i", false, "Show current project info")
-	flagList.addProject = *flag.Bool("ap", false, "Add a project to the config")
-	flagList.removeProject = *flag.Bool("rp", false, "Remove a project from the config")
-	flagList.listProjects = *flag.Bool("lp", false, "List all projects from the config")
-	flagList.beVerbose = *flag.Bool("V", false, "Be verbose, shows all environment variables set by nrun")
-	flagList.passthruNpm = *flag.Bool("n", false, "Pass through to npm")
-	flagList.systemInfo = *flag.Bool("I", false, "Get the system information")
+	originalWorkingDir, _ := os.Getwd()
+	var flagList *FlagList
+	flagList = new(FlagList)
+	flagList.showScript = flag.Bool("s", false, "Show the script")
+	flagList.showHelp = flag.Bool("h", false, "Show help")
+	flagList.showList = flag.Bool("l", false, "Show all scripts")
+	flagList.showLicense = flag.Bool("L", false, "Show licenses of dependencies")
+	flagList.showVersion = flag.Bool("v", false, "Show current version")
+	flagList.dummyCode = flag.Bool("d", false, "Exec some development dummy code")
+	flagList.useAnotherPath = flag.String("p", "", "Use another path to find the package.json")
+	flagList.showCurrentProjectInfo = flag.Bool("i", false, "Show current project info")
+	flagList.addProject = flag.Bool("ap", false, "Add a project to the config")
+	flagList.removeProject = flag.Bool("rp", false, "Remove a project from the config")
+	flagList.listProjects = flag.Bool("lp", false, "List all projects from the config")
+	flagList.beVerbose = flag.Bool("V", false, "Be verbose, shows all environment variables set by nrun")
+	flagList.passthruNpm = flag.Bool("n", false, "Pass through to npm")
+	flagList.systemInfo = flag.Bool("I", false, "Get the system information")
+	flagList.executeCommand = flag.Bool("e", false, "Execute a command")
+	flagList.executeCommandInProjects = flag.Bool("ep", false, "Execute a command in all projects")
+	flagList.executeScript = flag.Bool("x", false, "Execute a script")
+	flagList.listExecutableScripts = flag.Bool("lx", false, "List all executable scripts")
+	// flagList.addExecutableScript = flag.Bool("ax", false, "Add an executable script")
+	// flagList.removeExecutableScript = flag.Bool("rx", false, "Remove an executable script")
+	flagList.measureTime = flag.Bool("T", false, "Measure the time it takes to execute the script")
 
 	flag.Parse()
 
-	if flagList.systemInfo {
+	timeStarted := time.Now()
+	defer func() {
+		if flagList.measureTime != nil && *flagList.measureTime {
+			duration := time.Since(timeStarted)
+			if int(duration.Minutes()) > 0 {
+				fmt.Printf("\nTime elapsed: %dm %ds\n", int(duration.Minutes()), int(duration.Seconds())-(int(duration.Minutes())*60))
+			} else if int(duration.Seconds()) > 10 {
+				fmt.Printf("\nTime elapsed: %.1fs\n", duration.Seconds())
+			} else if int(duration.Seconds()) > 5 {
+				fmt.Printf("\nTime elapsed: %.2fs\n", duration.Seconds())
+			} else if int(duration.Seconds()) > 1 {
+				fmt.Printf("\nTime elapsed: %.3fs\n", duration.Seconds())
+			} else if int(duration.Milliseconds()) > 20 {
+				fmt.Printf("\nTime elapsed: %dms\n", int(duration.Milliseconds()))
+			} else if int(duration.Microseconds()) > 20 {
+				fmt.Printf("\nTime elapsed: %dus\n", int(duration.Microseconds()))
+			} else {
+				fmt.Println("\nTime elapsed:", duration)
+			}
+		}
+	}()
+
+	if *flagList.systemInfo {
 		SystemInfo()
 		return
 	}
-	if flagList.showHelp == true {
+	if *flagList.showHelp == true {
 		fmt.Println("nrun - The npm script runner")
 		fmt.Println("============================")
 		fmt.Println("nrun will lookup the package.json used by the current project and execute the named script found in the scripts section of the package.json.")
@@ -755,23 +869,26 @@ func main() {
 		fmt.Println("  nrun -L ([license name]) (names)  Shows all licenses of dependencies")
 		fmt.Println("  nrun -V                           Shows all environment variables set by nrun")
 		fmt.Println("  nrun -nv <node version>           Use a specific node version")
+		fmt.Println("  nrun -e <command>                 Execute a command")
+		fmt.Println("  nrun -ep <command>                Execute a command in all projects")
+		fmt.Println("  nrun -T                           Measure the time it takes to execute the script")
 		fmt.Println("For more information, see README.md")
 		return
 	}
 
-	if flagList.listProjects == true {
+	if *flagList.listProjects == true {
 		listProjectsFromConfig()
 		return
 	}
-	if flagList.addProject == true {
+	if *flagList.addProject == true {
 		addProjectToConfig(flag.Args())
 		return
 	}
-	if flagList.removeProject == true {
+	if *flagList.removeProject == true {
 		removeProjectFromConfig(flag.Args())
 		return
 	}
-	if flagList.dummyCode == true {
+	if *flagList.dummyCode == true {
 		fmt.Println("Dummy code that outputs the path to different shells if they are found")
 
 		cmd := exec.Command("which", "sh")
@@ -809,7 +926,7 @@ func main() {
 		return
 	}
 
-	if flagList.showVersion == true {
+	if *flagList.showVersion == true {
 		fmt.Println(version)
 		return
 	}
@@ -824,15 +941,15 @@ func main() {
 		log.Println(wdErr)
 		return
 	}
-	if flagList.useAnotherPath == "" {
+	if *flagList.useAnotherPath == "" {
 		env := os.Getenv("NRUNPROJECT")
 		if env != "" {
-			flagList.useAnotherPath = env
+			*flagList.useAnotherPath = env
 		}
 	}
-	if flagList.useAnotherPath != "" {
-		_, _, projects := GetDefaultValues("")
-		path = flagList.useAnotherPath
+	if *flagList.useAnotherPath != "" {
+		_, _, projects, _ := GetDefaultValues("")
+		path = *flagList.useAnotherPath
 		if _, ok := projects[path]; ok {
 			path = projects[path]
 		}
@@ -843,7 +960,73 @@ func main() {
 		os.Chdir(path)
 	}
 	packageJSON, path, processErr := ProcessPath(path)
-	defaultValues, defaultEnvironment, _ := GetDefaultValues(path)
+	defaultValues, defaultEnvironment, projects, scripts := GetDefaultValues(path)
+
+	if flagList.executeCommandInProjects != nil && *flagList.executeCommandInProjects == true {
+		if len(script) == 0 {
+			log.Println("No command given")
+			return
+		}
+		if len(args) > 0 && args[0] == "--" {
+			args = args[1:]
+		}
+		if len(args) > 1 && args[1] == "--" {
+			tempArgs := args[0]
+			args = args[2:]
+			args = append([]string{tempArgs}, args...)
+		}
+		execArgs := args
+		if len(execArgs) > 0 {
+			execArgs = execArgs[1:]
+		}
+		for projectName, projectPath := range projects {
+			if flagList.beVerbose != nil && *flagList.beVerbose == true {
+				fmt.Println("================================================================================")
+				fmt.Println("Executing", script, strings.Join(execArgs, " "))
+				fmt.Println("  in project", projectName, "at", projectPath)
+				fmt.Println("================================================================================")
+			}
+			ExecuteCommand(projectPath, script, execArgs, defaultValues, defaultEnvironment, flagList)
+			if flagList.beVerbose != nil && *flagList.beVerbose == true {
+				fmt.Println("================================================================================")
+			}
+			fmt.Println("")
+		}
+		return
+	}
+
+	if flagList.executeCommand != nil && *flagList.executeCommand == true {
+		execArgs := args
+		if len(execArgs) > 0 {
+			execArgs = execArgs[1:]
+		} else {
+			execArgs = []string{}
+		}
+		ExecuteCommand(path, script, execArgs, defaultValues, defaultEnvironment, flagList)
+		return
+	}
+
+	if flagList.executeScript != nil && *flagList.executeScript == true {
+		if len(scripts) > 0 && len(scripts[script]) > 0 {
+			ExecuteScripts(path, scripts[script], args[1:])
+		}
+		return
+	}
+
+	if flagList.listExecutableScripts != nil && *flagList.listExecutableScripts == true {
+		fmt.Println("Executable scripts:")
+		for scriptName, scriptScripts := range scripts {
+			fmt.Println("  ", scriptName)
+			for _, scriptScript := range scriptScripts {
+				fmt.Println("    ->", scriptScript)
+			}
+		}
+		return
+	}
+
+	if originalWorkingDir != path {
+		flagList.usedPath = path
+	}
 
 	if processErr != nil {
 		if packageJSON == nil {
@@ -862,7 +1045,7 @@ func main() {
 			script = defaultValues[script]
 		}
 	}
-	if flagList.showLicense == true {
+	if *flagList.showLicense == true {
 		licenseList := make(map[string][]string, 1000)
 		licenseList = showLicenseInfo(path, licenseList)
 		licenseListKeys := make([]string, 0, len(licenseList))
@@ -890,16 +1073,16 @@ func main() {
 		}
 		return
 	}
-	if flagList.showCurrentProjectInfo == true {
+	if *flagList.showCurrentProjectInfo == true {
 		fmt.Println("Current project is", path)
 		return
 	}
 	if processErr != nil {
 		log.Println(processErr)
 	} else {
-		if len(args) == 0 || flagList.showList == true {
+		if len(args) == 0 || *flagList.showList == true {
 			ShowScripts(*packageJSON, defaultValues, defaultEnvironment)
-		} else if flagList.showScript == true {
+		} else if *flagList.showScript == true {
 			ShowScript(*packageJSON, script)
 		} else {
 			RunNPM(*packageJSON, script, args[1:], defaultEnvironment, flagList)
