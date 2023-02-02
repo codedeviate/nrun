@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.14.0**
+**Current version is v0.15.0**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -48,13 +48,16 @@ and the command that this script runs will be printed out.
   nrun -p <project>                 Run the script in the specified project path
   nrun -s <scriptname>              Show the script that will be executed without running it
   nrun -h                           Shows help section
-  nrun -lp                          Shows all available projects
-  nrun -ap <project> <path>         Add a project to the list of projects
-  nrun -rp <project>                Remove a project from the list of projects
+  nrun -pl                          Shows all available projects
+  nrun -pa <project> <path>         Add a project to the list of projects
+  nrun -pr <project>                Remove a project from the list of projects
   nrun -L ([license name]) (names)  Shows the licenses for the project
   nrun -V                           Shows all environment variables set by nrun
-  nrun -e <command>                 Execute a command in the current shell
-  nrun -x                           Execute a defined nrun script
+  nrun -e <command>                 Execute a command in the current project
+  nrun -ep <command>                Execute a command in all defined projects
+  nrun -x  <script>                 Execute a defined nrun script in the current project
+  nrun -xl                          List all defined nrun scripts and the commands they run
+  nrun -xp <script>                 Execute a defined nrun script in all defined projects
   nrun -T                           Measure the time it takes to run a script
 ```
 
@@ -74,13 +77,13 @@ Show the script that will be executed without running it. This is useful if you 
 ### -h
 Shows help section. 
 
-### -lp
+### -pl
 Shows all available projects defined in the global .nrun.json file.
 
 ### -ap
 Add a project to the list of projects in the global .nrun.json file. The project-name given is first checked against all registered projects in the global .nrun.json file.
 
-### -rp
+### -pr
 Remove a project from the list of projects in the global .nrun.json file.
 
 ### -L
@@ -115,7 +118,8 @@ Scripts will be executed in separate shells and the output will be printed to th
 
 Flags and parameters can't be forwarded to the scripts.
 
-### -lx
+### -xp
+### -xl
 List all defined nrun scripts.
 
 ### -T
@@ -273,6 +277,105 @@ Or a more realistic example.
 # > nrun -p proj1 -e -- git commit -am "Some commit message"
 ```
 This will commit all changes in the proj1 directory.
+
+
+## nrun scripts
+
+In the .nrun.json file you can define scripts that can be executed with nrun.
+
+They are defined under the key "scripts" and the key name is the name of the script and the value is an array with the commands to execute.
+
+If the value in the command array begins with "@@" then this is regarded an internal command.
+
+### Environment variables
+
+#### NRUN_CURRENT_PATH
+This environment variable will be set to the current path.
+
+```json
+{
+  "scripts": {
+    "test": [
+      "echo $NRUN_CURRENT_PATH",
+      "echo $NRUN_CURRENT_SCRIPT"
+    ]
+  }
+}
+```
+This will print the current path and the current script name.
+
+#### NRUN_CURRENT_SCRIPT
+This environment variable will be set to the name of the script that is executed.
+
+#### NRUN_CURRENT_SCRIPT_CODE
+This environment variable will be set to the script that is executed.
+
+This might be somewhat useless since it only contains the current script value that is executed and not the entire code array.
+
+### Internal commands
+Internal commands are commands that are executed by nrun and not by the shell.
+
+The definition of the internal commands are as follows.
+```json
+{
+  "scripts": {
+    "test": [
+      "@@internalcommand: argument1,argument2"
+    ]
+  }
+}
+```
+
+#### @@hasfile, @@hasfiles
+These commands will both check if a file exists in the current directory.
+If the file exists then the command will continue.
+If the file doesn't exist then the command will return without completing the rest of the command array.
+
+Multiple filenames can be specified by separating them with a comma.
+
+Filenames can be relative to the projects path or absolute.
+
+The difference between **@@hasfile** and **@@hasfiles** is that **@@hasfile** will continue if one of the files exists while **@@hasfiles** will only continue if all the files exists.
+
+```json
+{
+  "scripts": {
+    "test": [
+      "@@hasfile: package.json",
+      "npm run test"
+    ]
+  }
+}
+```
+
+```json
+{
+  "scripts": {
+    "test": [
+      "@@hasfiles: package.json,package-lock.json",
+      "npm run test"
+    ]
+  }
+}
+```
+
+#### @@cd
+This command will change the current directory to the specified directory.
+
+#### @@set
+Set an environment variable
+
+#### @@env
+This is the same as @@set
+
+#### @@unset
+Unset an environment variable
+
+#### @@unenv
+This is the same as @@unset
+
+#### @@echo
+Print a message to the stdout
 
 ## Makefile
 There are some predefined targets in the Makefile that can be used to build and install the tool.
