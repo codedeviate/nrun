@@ -285,7 +285,7 @@ func ShowScript(packageJSON PackageJSON, script string) {
 	if len(packageJSON.Scripts) > 0 && len(packageJSON.Scripts[script]) > 0 {
 		fmt.Printf("%s -> %s\n", script, packageJSON.Scripts[script])
 	} else {
-		log.Printf("Can't find any script called \"%s\"\n", script)
+		fmt.Printf("Can't find any script called \"%s\"\n", script)
 	}
 }
 
@@ -304,6 +304,25 @@ func GetShellByMagic(key string) (string, error) {
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return !errors.Is(err, os.ErrNotExist)
+}
+
+func IsDir(path string) bool {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return stat.Mode().IsDir()
+}
+
+func IsFile(path string) bool {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if stat.Mode().IsDir() {
+		return false
+	}
+	return stat.Mode().IsRegular()
 }
 
 func GetShell() (string, error) {
@@ -417,15 +436,15 @@ func addProjectToConfig(args []string) {
 				}
 				projPath, _ = filepath.Abs(projPath)
 				if _, err := os.Stat(projPath); errors.Is(err, os.ErrNotExist) {
-					fmt.Println("The path", "\""+projPath+"\"", "doesn't exists")
+					log.Println("The path", "\""+projPath+"\"", "doesn't exists")
 					return
 				}
 				if _, ok := config.Projects[args[0]]; ok {
 					if config.Projects[args[0]] == projPath {
-						fmt.Println("Project", "\""+args[0]+"\"", "already exists with this path")
+						log.Println("Project", "\""+args[0]+"\"", "already exists with this path")
 						return
 					}
-					fmt.Println("Project", "\""+args[0]+"\"", "located at", "\""+config.Projects[args[0]]+"\"", "will be replaced with", "\""+projPath+"\"")
+					log.Println("Project", "\""+args[0]+"\"", "located at", "\""+config.Projects[args[0]]+"\"", "will be replaced with", "\""+projPath+"\"")
 				}
 				config.Projects[args[0]] = projPath
 				jsonFile, err := os.Create(jsonFile.Name())
@@ -438,7 +457,7 @@ func addProjectToConfig(args []string) {
 					if err != nil {
 						log.Println("Failed with", err)
 					}
-					fmt.Println("Project", "\""+args[0]+"\"", "added")
+					log.Println("Project", "\""+args[0]+"\"", "added")
 				}
 			}
 		}
@@ -472,7 +491,7 @@ func removeProjectFromConfig(args []string) {
 					if err != nil {
 						log.Println("Failed with", err)
 					}
-					fmt.Println("Project", "\""+args[0]+"\"", "removed")
+					log.Println("Project", "\""+args[0]+"\"", "removed")
 					if len(args) > 1 {
 						args = args[1:]
 						removeProjectFromConfig(args)
@@ -624,7 +643,6 @@ type Memory struct {
 }
 
 func parseLine(raw string) (key string, value int) {
-	fmt.Println(raw)
 	text := strings.ReplaceAll(raw[:len(raw)-2], " ", "")
 	keyValue := strings.Split(text, ":")
 	intValue, _ := strconv.Atoi(keyValue[1])
@@ -780,6 +798,11 @@ func ExecuteScripts(path string, scriptName string, scripts []string, args []str
 			if len(script) > 2 {
 				if script[0:2] == "@@" {
 					script = script[2:]
+					negate := false
+					if len(script) > 0 && script[0] == '!' {
+						negate = true
+						script = script[1:]
+					}
 					if strings.Contains(script, ":") {
 						commandParts := strings.Split(script, ":")
 						if len(commandParts) > 1 {
@@ -798,10 +821,18 @@ func ExecuteScripts(path string, scriptName string, scripts []string, args []str
 									if FileExists(file) {
 										fileFound = true
 									} else if commandName == "hasfiles" {
+										if negate {
+											continue
+										}
 										return
 									}
 								}
 								if !fileFound {
+									if negate {
+										continue
+									}
+									return
+								} else if negate {
 									return
 								}
 							} else if commandName == "cd" {
@@ -815,26 +846,50 @@ func ExecuteScripts(path string, scriptName string, scripts []string, args []str
 										path, _ = os.Getwd()
 									}
 								}
-							} else if commandName == "set" {
+							} else if commandName == "set" || commandName == "env" {
+								commandArgs = strings.TrimSpace(commandArgs)
 								if strings.Contains(commandArgs, "=") {
 									commandParts := strings.Split(commandArgs, "=")
 									if len(commandParts) > 1 {
 										os.Setenv(commandParts[0], strings.Join(commandParts[1:], "="))
 									}
 								}
-							} else if commandName == "unset" {
-								os.Unsetenv(commandArgs)
-							} else if commandName == "env" {
-								if strings.Contains(commandArgs, "=") {
-									commandParts := strings.Split(commandArgs, "=")
-									if len(commandParts) > 1 {
-										os.Setenv(commandParts[0], strings.Join(commandParts[1:], "="))
-									}
-								}
-							} else if commandName == "unenv" {
+							} else if commandName == "unset" || commandName == "unenv" {
+								commandArgs = strings.TrimSpace(commandArgs)
 								os.Unsetenv(commandArgs)
 							} else if commandName == "echo" {
+								commandArgs = strings.TrimSpace(commandArgs)
 								fmt.Println(commandArgs)
+							} else if commandName == "isfile" {
+								commandArgs = strings.TrimSpace(commandArgs)
+								if len(commandArgs) > 0 {
+									if commandArgs[0] != '/' {
+										commandArgs = path + "/" + commandArgs
+									}
+									if !IsFile(commandArgs) {
+										if negate {
+											continue
+										}
+										return
+									} else if negate {
+										return
+									}
+								}
+							} else if commandName == "isdir" {
+								commandArgs = strings.TrimSpace(commandArgs)
+								if len(commandArgs) > 0 {
+									if commandArgs[0] != '/' {
+										commandArgs = path + "/" + commandArgs
+									}
+									if !IsDir(commandArgs) {
+										if negate {
+											continue
+										}
+										return
+									} else if negate {
+										return
+									}
+								}
 							}
 						}
 					} else {
@@ -846,7 +901,7 @@ func ExecuteScripts(path string, scriptName string, scripts []string, args []str
 			}
 			shell, shellErr := GetShell()
 			if shellErr != nil {
-				fmt.Println("Error:", shellErr)
+				log.Println("Error:", shellErr)
 				return
 			}
 			cmd := exec.Command(shell, append([]string{"-c", script})...)
@@ -1128,7 +1183,7 @@ func main() {
 			packageJSON = &PackageJSON{}
 		}
 		if PassthruNpm(*packageJSON, script, args, defaultEnvironment) == false {
-			fmt.Println(processErr)
+			log.Println(processErr)
 		}
 		return
 	}
@@ -1166,7 +1221,7 @@ func main() {
 		return
 	}
 	if *flagList.showCurrentProjectInfo == true {
-		fmt.Println("Current project is", path)
+		fmt.Println("Current project path is", path)
 		return
 	}
 	if processErr != nil {
@@ -1177,7 +1232,7 @@ func main() {
 		} else if *flagList.showScript == true {
 			ShowScript(*packageJSON, script)
 		} else {
-			fmt.Println("Executing", script, strings.Join(args, " "))
+			log.Println("Executing", script, strings.Join(args, " "))
 			RunNPM(*packageJSON, script, args, defaultEnvironment, flagList)
 		}
 	}

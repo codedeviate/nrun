@@ -326,7 +326,18 @@ The definition of the internal commands are as follows.
 }
 ```
 
-#### @@hasfile, @@hasfiles
+Commands that returns a boolean value that either lets the script continue or not can be negated by adding an exclamation mark in front of the command.
+```json
+{
+  "scripts": {
+    "test": [
+      "@@!internalcommand: argument1,argument2"
+    ]
+  }
+}
+```
+
+#### hasfile, hasfiles
 These commands will both check if a file exists in the current directory.
 If the file exists then the command will continue.
 If the file doesn't exist then the command will return without completing the rest of the command array.
@@ -335,7 +346,7 @@ Multiple filenames can be specified by separating them with a comma.
 
 Filenames can be relative to the projects path or absolute.
 
-The difference between **@@hasfile** and **@@hasfiles** is that **@@hasfile** will continue if one of the files exists while **@@hasfiles** will only continue if all the files exists.
+The difference between **hasfile** and **hasfiles** is that **hasfile** will continue if one of the files exists while **hasfiles** will only continue if all the files exists.
 
 ```json
 {
@@ -359,23 +370,29 @@ The difference between **@@hasfile** and **@@hasfiles** is that **@@hasfile** wi
 }
 ```
 
-#### @@cd
+#### cd
 This command will change the current directory to the specified directory.
 
-#### @@set
+#### set
 Set an environment variable
 
-#### @@env
-This is the same as @@set
+#### env
+This is the same as **set**
 
-#### @@unset
+#### unset
 Unset an environment variable
 
-#### @@unenv
+#### unenv
 This is the same as @@unset
 
-#### @@echo
+#### echo
 Print a message to the stdout
+
+#### @@isfile
+Check if a file exists in the current directory.
+
+#### isdir
+Check if a directory exists in the current directory.
 
 ## Makefile
 There are some predefined targets in the Makefile that can be used to build and install the tool.
