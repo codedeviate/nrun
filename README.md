@@ -119,6 +119,10 @@ Scripts will be executed in separate shells and the output will be printed to th
 Flags and parameters can't be forwarded to the scripts.
 
 ### -xp
+Execute a defined nrun script in all defined projects.
+
+This is useful if you want to execute multiple commands in all projects.
+
 ### -xl
 List all defined nrun scripts.
 

@@ -781,17 +781,6 @@ func ExecuteCommand(path string, script string, args []string, defaultValues map
 }
 
 func ExecuteScripts(path string, scriptName string, scripts []string, args []string, showWarning bool) {
-	fmt.Println("Executing scripts for", scriptName, "in", path, "with", strings.Join(scripts, " "))
-	if showWarning {
-		fmt.Println("================================================================================")
-		fmt.Println("Warning: Executing script is currently an experimental work in progress.")
-		fmt.Println("This feature might be removed in the future without prior notice.")
-		fmt.Println("Please use at your own risk.")
-		fmt.Println("Do not report issues about this feature. Unless you are willing to fix them.")
-		fmt.Println("DO NOT USE THIS FEATURE IN PRODUCTION ENVIRONMENTS.")
-		fmt.Println("================================================================================")
-		fmt.Println("")
-	}
 	if len(scripts) > 0 {
 		os.Chdir(path)
 		for _, script := range scripts {
@@ -1232,7 +1221,6 @@ func main() {
 		} else if *flagList.showScript == true {
 			ShowScript(*packageJSON, script)
 		} else {
-			log.Println("Executing", script, strings.Join(args, " "))
 			RunNPM(*packageJSON, script, args, defaultEnvironment, flagList)
 		}
 	}
