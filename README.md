@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.15.0**
+**Current version is v0.16.0**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -140,6 +140,32 @@ The time will be printed to the terminal when the script has finished.
 | 0.02 seconds - 1 second | Xms    | 657ms   |
 | 20ms - 0.02 seconds     | Xus    | 1220us  |
 | 0 -> 20ms               | Xns    | 16922ns |
+
+
+## Pre- and post-scripts
+It is possible to define scripts that will be run before and after the main script.
+This is useful if you want to do some setup before running the main script and some cleanup after the main script has finished.
+
+The naming convention for pre- and post-scripts is straightforward. Add "pre" before the name of the main script to make it execute before the main script and add "post" before the name of the main script to make it execute after the main script.
+
+For example, if you have a script called "test" then you can define a script called "pretest" that will be run before the "test" script and a script called "posttest" that will be run after the "test" script.
+
+```json
+{
+  "scripts": {
+    "test": "echo \"Running tests\"",
+    "pretest": "echo \"Setting up test environment\"",
+    "posttest": "echo \"Cleaning up test environment\""
+  }
+}
+```
+
+The default behavior in npm is that it will look for a pre-script and a post-script for the script that is run.
+
+In nrun however there is a slight difference.
+When the pre-script executes it will also look for a pre- and post-script which makes it possible to add a pre-pre-script if needed.
+Please note that this is not the behavior in npm.
+
 
 
 ## Installation

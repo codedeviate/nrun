@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const version = "0.15.0"
+const version = "0.16.0"
 
 type PackageJSON struct {
 	Name            string                 `json:"name"`
@@ -98,6 +98,9 @@ func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
 func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string, flagList *FlagList) {
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
+			if len(packageJSON.Scripts["pre"+script]) > 0 {
+				RunNPM(packageJSON, "pre"+script, args, envs, flagList)
+			}
 			runscript := packageJSON.Scripts[script]
 			match, _err := regexp.Match(`^[^\s]*nrun(\s|$)`, []byte(runscript))
 			if _err == nil && match {
@@ -146,6 +149,9 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 			if runErr != nil {
 				log.Println(runErr)
 				return
+			}
+			if len(packageJSON.Scripts["post"+script]) > 0 {
+				RunNPM(packageJSON, "post"+script, args, envs, flagList)
 			}
 		} else {
 			if PassthruNpm(packageJSON, script, args, envs) == false {
