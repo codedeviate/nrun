@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const version = "0.16.0"
+const version = "0.16.1"
 
 type PackageJSON struct {
 	Name            string                 `json:"name"`
@@ -1195,6 +1195,9 @@ func main() {
 			licenseListKeys = append(licenseListKeys, k)
 		}
 		sort.Strings(licenseListKeys)
+		if len(script) > 0 {
+			args = append(args, script)
+		}
 		for index, key := range licenseListKeys {
 			values := licenseList[licenseListKeys[index]]
 			if len(args) == 0 || script == "names" || (contains(args, strings.ToLower(key)) || contains(args, "names") || wildMatch(args, key)) {
