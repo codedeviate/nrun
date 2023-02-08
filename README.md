@@ -195,6 +195,9 @@ Paths are defined under a key called "path" and environment variables are define
 Projects are defined under a key called "projects" and the key name is the name of the project and the value is the path to the project.
 Projects can only be defined in the global .nrun.json file.
 
+Scripts are defined under a key called "scripts" and the key name is the name of the script and the value is the command to execute.
+Scripts can only be defined in the global .nrun.json file.
+
 The environment variables is not connected to the keys in the same directory but rather to the full script name.
 
 ### Example .nrun.json
@@ -212,7 +215,14 @@ The environment variables is not connected to the keys in the same directory but
   },
   "projects": {
     "nruntest": "/Users/codedeviate/Development/nruntest"
-  }
+  },
+    "scripts": {
+        "test": [
+            "echo \"Running tests\"",
+            "echo \"Running tests\"",
+            "echo \"Running tests\""
+        ]
+    }
 }
 ```
 

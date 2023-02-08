@@ -17,6 +17,19 @@ func main() {
 	flagList := helper.ParseFlags()
 	timeStarted := time.Now()
 
+	args := flag.Args()
+	var script string
+	if len(args) > 0 {
+		script = args[0]
+		args = args[1:]
+	}
+
+	path, wdErr := os.Getwd()
+	if wdErr != nil {
+		log.Println(wdErr)
+		return
+	}
+
 	defer func() {
 		if flagList.MeasureTime != nil && *flagList.MeasureTime {
 			duration := time.Since(timeStarted)
@@ -65,7 +78,7 @@ func main() {
 		helper.RemoveProjectFromConfig(flag.Args())
 		return
 	}
-	
+
 	if *flagList.DummyCode == true {
 		helper.DummyCode()
 		return
@@ -73,19 +86,6 @@ func main() {
 
 	if *flagList.ShowVersion == true {
 		fmt.Println(Version)
-		return
-	}
-
-	args := flag.Args()
-	var script string
-	if len(args) > 0 {
-		script = args[0]
-		args = args[1:]
-	}
-
-	path, wdErr := os.Getwd()
-	if wdErr != nil {
-		log.Println(wdErr)
 		return
 	}
 
