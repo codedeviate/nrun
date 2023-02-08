@@ -200,7 +200,7 @@ Scripts can only be defined in the global .nrun.json file.
 
 The environment variables is not connected to the keys in the same directory but rather to the full script name.
 
-### Example .nrun.json
+### Example of global .nrun.json
 ```json
 {
   "path": {
@@ -216,13 +216,28 @@ The environment variables is not connected to the keys in the same directory but
   "projects": {
     "nruntest": "/Users/codedeviate/Development/nruntest"
   },
-    "scripts": {
-        "test": [
-            "echo \"Running tests\"",
-            "echo \"Running tests\"",
-            "echo \"Running tests\""
-        ]
+  "scripts": {
+    "test": [
+      "echo \"Running tests\"",
+      "echo \"Running tests\"",
+      "echo \"Running tests\""
+    ]
+  }
+}
+```
+### Example of local .nrun.json
+```json
+{
+  "path": {
+    "/Users/codedeviate/Development/nruntest": {
+      "start": "start:localhost"
     }
+  },
+  "env": {
+    "/Users/codedeviate/Development/nruntest": {
+      "start:localhost": "PORT=3007"
+    }
+  }
 }
 ```
 
@@ -259,6 +274,13 @@ Global section names are "\*" for mapping values and "\*" for environment values
   },
   "projects": {
     "nruntest": "/Users/codedeviate/Development/nruntest"
+  },
+  "scripts": {
+    "test": [
+      "echo \"Running tests\"",
+      "echo \"Running tests\"",
+      "echo \"Running tests\""
+    ]
   }
 }
 ```
