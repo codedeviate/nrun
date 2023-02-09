@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.16.1**
+**Current version is v0.18.0**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -58,8 +58,16 @@ and the command that this script runs will be printed out.
   nrun -x  <script>                 Execute a defined nrun script in the current project
   nrun -xl                          List all defined nrun scripts and the commands they run
   nrun -xp <script>                 Execute a defined nrun script in all defined projects
+  nrun -xat <token>                 Add the X_AUTH_TOKEN environment variable to the script environment
   nrun -T                           Measure the time it takes to run a script
+  nrun -w <url>                     Get the content of the url and print it to the terminal
+  nrun -wt <template>               Get the content of the url and its parameters defined in the template and print it to the terminal
+  nrun -wi                          Get the content of the url and print information about the response and the headers
+  nrun -wh                          Get the content of the url and print the headers
+  nrun -wnb                         Get the content of the url but don't print the body
+  nrun -who                         Get the content of the url but only print the headers
 ```
+*Please note that the examples of the listed flags may require a combination with other flags and might not work stand-alone.*
 
 ## Flags
 
@@ -125,6 +133,13 @@ This is useful if you want to execute multiple commands in all projects.
 
 ### -xl
 List all defined nrun scripts.
+
+### -xat
+Add the X_AUTH_TOKEN environment variable to the script.
+
+The string given as a parameter can either be an index to a token in the .nrun.json file or a string that will be used as the token.
+
+(This flag can also be used with the -w flag.)
 
 ### -T
 Measure the time it takes to run a script.
@@ -222,6 +237,22 @@ The environment variables is not connected to the keys in the same directory but
       "echo \"Running tests\"",
       "echo \"Running tests\""
     ]
+  },
+  "xauthtokens":{
+    "0": "1234567890",
+    "1": "0987654321"
+  },
+  "webget": {
+    "test": {
+      "method": "GET",
+      "url": "http://localhost:3007/invoices?limit=100",
+      "format": "auto",
+      "body": "",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "XAuthToken": "14576cg9dg64752cv7cvb92"
+    }
   }
 }
 ```
@@ -455,6 +486,33 @@ Check if a file exists in the current directory.
 
 #### isdir
 Check if a directory exists in the current directory.
+
+## Doing web requests with nrun
+nrun has a built-in web request function that can be used to do web requests.
+
+Web requests can be done with the flag **-w**
+
+```bash
+# > nrun -w https://www.google.com
+```
+
+### -w flag
+
+### -wi flag (Information)
+
+### -wt flag (Template)
+
+### -wh flag (Headers)
+
+### -who flag (Headers only)
+
+### -wm flag (Method)
+
+### -wf flag (Format)
+
+### -wnb flag (No body)
+
+### -xat flag (X-AUTH-TOKEN)
 
 ## Makefile
 There are some predefined targets in the Makefile that can be used to build and install the tool.

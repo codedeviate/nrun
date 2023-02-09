@@ -5,15 +5,17 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"regexp"
 	"strings"
 )
 
-func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[string]string, flagList *FlagList, Version string) {
+func RunNPM(packageJSON PackageJSON, path string, script string, args []string, envs map[string]string, flagList *FlagList, Version string) {
+	fmt.Println("Running", script, "in", path, "with args", strings.Join(args, ","))
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
 			if len(packageJSON.Scripts["pre"+script]) > 0 {
-				RunNPM(packageJSON, "pre"+script, args, envs, flagList, Version)
+				RunNPM(packageJSON, path, "pre"+script, args, envs, flagList, Version)
 			}
 			runscript := packageJSON.Scripts[script]
 			match, _err := regexp.Match(`^[^\s]*nrun(\s|$)`, []byte(runscript))
@@ -31,25 +33,56 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 			}
 			cmd := exec.Command(shell, args...)
 
-			if len(envs[script]) > 0 {
-				if *flagList.BeVerbose {
-					fmt.Println("============================================================")
-					fmt.Println("Adding environment:", envs[script])
-					if flagList.UsedPath != "" {
-						fmt.Println("Using path:", flagList.UsedPath)
-					}
-					fmt.Println("============================================================")
-				}
-				cmd.Env = append(cmd.Environ(), envs[script])
-			} else {
-				if *flagList.BeVerbose {
-					if flagList.UsedPath != "" {
+			if flagList.NoDefaultValues == nil || *flagList.NoDefaultValues == false {
+				if len(envs[script]) > 0 {
+					if *flagList.BeVerbose {
 						fmt.Println("============================================================")
-						fmt.Println("Using path:", flagList.UsedPath)
+						fmt.Println("Adding environment:", envs[script])
+						if flagList.UsedPath != "" {
+							fmt.Println("Using path:", flagList.UsedPath)
+						}
 						fmt.Println("============================================================")
 					}
+					cmd.Env = append(cmd.Environ(), envs[script])
+				} else {
+					if *flagList.BeVerbose {
+						if flagList.UsedPath != "" {
+							fmt.Println("============================================================")
+							fmt.Println("Using path:", flagList.UsedPath)
+							fmt.Println("============================================================")
+						}
+					}
+					cmd.Env = append(cmd.Environ(), envs[script])
 				}
-				cmd.Env = append(cmd.Environ(), envs[script])
+			}
+
+			// Add node_modules/.bin to path if it exists
+			node_bin_modules := path + "/node_modules/.bin"
+			if IsDir(node_bin_modules) {
+				cmd.Env = append(cmd.Environ(), "PATH="+node_bin_modules+":"+os.Getenv("PATH"))
+			}
+
+			// Add npm root -g to path if it exists (for global npm packages)
+			npmRootGCmd := exec.Command("npm", "root -g")
+			npmRootGCmdPathBytes, _ := npmRootGCmd.Output()
+			npmRootGCmdPath := strings.Trim(string(npmRootGCmdPathBytes), " \n")
+			if len(npmRootGCmdPath) > 0 && IsDir(npmRootGCmdPath) {
+				cmd.Env = append(cmd.Environ(), "PATH="+npmRootGCmdPath+":"+os.Getenv("PATH"))
+			}
+
+			if *flagList.XAuthToken != "" {
+				usr, _ := user.Current()
+				dir := usr.HomeDir
+				config, err := ReadConfig(dir + "/.nrun.json")
+				if err == nil {
+					if config.XAuthTokens[*flagList.XAuthToken] != "" {
+						cmd.Env = append(cmd.Environ(), "X_AUTH_TOKEN="+config.XAuthTokens[*flagList.XAuthToken])
+					} else {
+						cmd.Env = append(cmd.Environ(), "X_AUTH_TOKEN="+*flagList.XAuthToken)
+					}
+				} else {
+					cmd.Env = append(cmd.Environ(), "X_AUTH_TOKEN="+*flagList.XAuthToken)
+				}
 			}
 			scriptNice := strings.Replace(script, ":", "_", -1)
 			if len(envs[scriptNice]) > 0 {
@@ -65,7 +98,7 @@ func RunNPM(packageJSON PackageJSON, script string, args []string, envs map[stri
 				return
 			}
 			if len(packageJSON.Scripts["post"+script]) > 0 {
-				RunNPM(packageJSON, "post"+script, args, envs, flagList, Version)
+				RunNPM(packageJSON, path, "post"+script, args, envs, flagList, Version)
 			}
 		} else {
 			if PassthruNpm(packageJSON, script, args, envs, Version) == false {

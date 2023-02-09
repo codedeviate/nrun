@@ -14,14 +14,26 @@ type PackageJSON struct {
 }
 
 type Config struct {
-	Env      map[string]map[string]string `json:"env"`
-	Path     map[string]map[string]string `json:"path"`
-	Projects map[string]string            `json:"projects"`
-	Scripts  map[string][]string          `json:"scripts"`
+	Env             map[string]map[string]string    `json:"env"`
+	Path            map[string]map[string]string    `json:"path"`
+	Projects        map[string]string               `json:"projects"`
+	Scripts         map[string][]string             `json:"scripts"`
+	WebGetTemplates map[string]WebGetTemplateStruct `json:"webget"`
+	XAuthTokens     map[string]string               `json:"xauthtokens"`
+}
+
+type WebGetTemplateStruct struct {
+	Method     string            `json:"method"`
+	URL        string            `json:"url"`
+	Format     string            `json:"format"`
+	Body       string            `json:"body"`
+	Headers    map[string]string `json:"headers"`
+	XAuthToken string            `json:xauthtoken`
 }
 
 type LicenseList map[string][]string
 type FlagList struct {
+	NoDefaultValues          *bool
 	ShowScript               *bool
 	ShowHelp                 *bool
 	ShowList                 *bool
@@ -46,6 +58,16 @@ type FlagList struct {
 	AddToExecutableScript    *string
 	RemoveExecutableScript   *string
 	MeasureTime              *bool
+	WebGet                   *bool
+	WebGetTemplate           *string
+	WebGetHeader             *bool
+	WebGetHeaderOnly         *bool
+	WebGetNoBody             *bool
+	WebGetInformation        *bool
+	WebGetMethod             *string
+	WebGetFormat             *string
+	XAuthToken               *string
+	TestAlarm                *int64 // Time in milliseconds. Currently not used
 }
 
 type Memory struct {

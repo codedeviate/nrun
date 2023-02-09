@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.17.0"
+const Version = "0.18.0"
 
 func main() {
 	originalWorkingDir, _ := os.Getwd()
@@ -18,6 +18,17 @@ func main() {
 	timeStarted := time.Now()
 
 	args := flag.Args()
+
+	if flagList.WebGetTemplate != nil && len(*flagList.WebGetTemplate) > 0 {
+		helper.WebGetTemplate(args, flagList)
+		return
+	}
+
+	if flagList.WebGet != nil && *flagList.WebGet {
+		helper.WebGet(args, flagList)
+		return
+	}
+
 	var script string
 	if len(args) > 0 {
 		script = args[0]
@@ -195,7 +206,7 @@ func main() {
 		} else if *flagList.ShowScript == true {
 			helper.ShowScript(*packageJSON, script)
 		} else {
-			helper.RunNPM(*packageJSON, script, args, defaultEnvironment, flagList, Version)
+			helper.RunNPM(*packageJSON, path, script, args, defaultEnvironment, flagList, Version)
 		}
 	}
 

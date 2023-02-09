@@ -110,6 +110,7 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 func ParseFlags() *FlagList {
 	var flagList *FlagList
 	flagList = new(FlagList)
+	flagList.NoDefaultValues = flag.Bool("D", false, "Do not use default values")
 	flagList.ShowScript = flag.Bool("s", false, "Show the script")
 	flagList.ShowHelp = flag.Bool("h", false, "Show help")
 	flagList.ShowList = flag.Bool("l", false, "Show all scripts")
@@ -133,8 +134,26 @@ func ParseFlags() *FlagList {
 	flagList.AddToExecutableScript = flag.String("xa", "", "Add to an executable script")
 	flagList.RemoveExecutableScript = flag.String("xr", "", "Remove an executable script")
 	flagList.MeasureTime = flag.Bool("T", false, "Measure the time it takes to execute the script")
+	flagList.WebGet = flag.Bool("w", false, "Do a http(s) request from the web")
+	flagList.WebGetTemplate = flag.String("wt", "", "Do a web request based on a template defined in the global .nrun.json")
+	flagList.WebGetHeader = flag.Bool("wh", false, "Show headers for the web response")
+	flagList.WebGetHeaderOnly = flag.Bool("who", false, "Show only headers for the web response")
+	flagList.WebGetNoBody = flag.Bool("wnb", false, "Do not show the body for the web response")
+	flagList.WebGetInformation = flag.Bool("wi", false, "Show information about the web response")
+	flagList.WebGetMethod = flag.String("wm", "", "Set the method to use for the web request")
+	flagList.WebGetFormat = flag.String("wf", "", "Set the format for the web request")
+	flagList.XAuthToken = flag.String("xat", "", "Set the X-AUTH-TOKEN to use")
+	// Inactive flags
+	flagList.TestAlarm = flag.Int64("t", 0, "Measure times in tests and notify when they are too long (time given in milliseconds)")
 
 	flag.Parse()
+
+	/* Override WebGetHeader and WebGetNoBody if WebGetHeaderOnly is set */
+	if *flagList.WebGetHeaderOnly {
+		*flagList.WebGetHeader = true
+		*flagList.WebGetNoBody = true
+	}
+
 	return flagList
 }
 
@@ -238,4 +257,29 @@ func GetShellByMagic(key string) (string, error) {
 		return spath, err
 	}
 	return "", errors.New("shell not found")
+}
+
+func ReadConfig(filepath string) (*Config, error) {
+	if !FileExists(filepath) {
+		return nil, errors.New("config file not found")
+	}
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	if _, err := os.Stat(filepath); !errors.Is(err, os.ErrNotExist) {
+		jsonFile, err := os.Open(filepath)
+		if err != nil {
+			log.Println("Failed with", err)
+			return nil, err
+		} else {
+			byteValue, _ := os.ReadFile(jsonFile.Name())
+			var config Config
+			_ = json.Unmarshal(byteValue, &config)
+			jsonFile.Close()
+			return &config, nil
+		}
+	}
+	return nil, err
 }
