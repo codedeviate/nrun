@@ -15,33 +15,33 @@ The major reason for using it is the number of keystrokes that can be saved. Whe
 It's also much easier to map your most used command to shorter ones that are easier to remember and faster to type.
 
 So if you have to type something like
-``` bash
+```console
 # > npm run test:coverage:localhost
 ```
 every time you want to run your tests. Then it would be easier to use nrun and type
-``` bash
+```console
 # > nrun test:coverage:localhost
 ```
 And by using shortcuts in .nrun.json you might shorten this even more to
-``` bash
+```console
 # > nrun test
 ```
 or something else that is easier to remember and faster to type.
 
 And if you're not sure on which scripts there are available you can easily type
-``` bash
+```console
 # > nrun
 ```
 and all the available scripts will be printed out in a list.
 
 If you want to know what a certain script does you can write
-``` bash
+```console
 # > nrun -s test:coverage:localhost
 ```
 and the command that this script runs will be printed out.
 
 ## Usage:
-```bash
+```console
   nrun <scriptname> [args]          Run the script by name
   nrun -l                           Shows all available scripts
   nrun                              Shows all available scripts (same as the -l flag)
@@ -184,7 +184,7 @@ Please note that this is not the behavior in npm.
 
 
 ## Installation
-```bash
+```console
 # > git clone git@github.com:codedeviate/nrun.git
 # > cd nrun
 # > go install
@@ -273,11 +273,11 @@ The environment variables is not connected to the keys in the same directory but
 ```
 
 If you are in **/Users/codedeviate/Development/nruntest** and execute 
-```bash
+```console
 nrun start
 ```
 then that will be the same as executing
-```bash
+```console
 PORT=3007 npm run start:localhost
 ```
 which is saving some keystrokes.
@@ -316,57 +316,57 @@ Global section names are "\*" for mapping values and "\*" for environment values
 }
 ```
 Now you can be in any project directory and type
-``` bash
+```console
 # > nrun test
 ```
 which is the equivalent to
-``` bash
+```console
 # > PORT=3009 npm run test:coverage:localhost
 ```
 
 If you are in a different path than you project then you can use the -p flag to specify the path to the project.
-``` bash
+```console
 # > nrun -p nruntest test
 ```
 This is the same as
-``` bash
+```console
 # > cd /Users/codedeviate/Development/nruntest
 # > nrun test
 ```
 
 
-``` bash
+```console
 # > nrun -p /Users/codedeviate/Development/nruntest test
 ```
 
 
 ## Different ways to use nrun
 ### You want to run a script that is located in another project
-```bash
+```console
 # > nrun -p proj1 test
 ```
 
 ### You have a project that is your main project that you want to use as your default project
 Set the environment variable NRUNPROJECT to the name of the project.
-```bash
+```console
 # > nrun test
 ```
 This will list all scripts in your default project.
 
 If you have a default project defined but want to use nrun in the local directory you'll have to use the -p flag.
-```bash
+```console
 # > nrun -p .
 ```
 This will list all scripts in your local directory.
 
 If you want to execute a command in another project you can use the -e flag and the -p flag.
-```bash
+```console
 # > nrun -p proj1 -e ls
 ```
 This will list all files in the proj1 directory.
 
 Or a more realistic example.
-```bash
+```console
 # > nrun -p proj1 -e -- git commit -am "Some commit message"
 ```
 This will commit all changes in the proj1 directory.
@@ -492,7 +492,7 @@ nrun has a built-in web request function that can be used to do web requests.
 
 Web requests can be done with the flag **-w**
 
-```bash
+```console
 # > nrun -w https://www.google.com
 ```
 
@@ -500,6 +500,32 @@ Web requests can be done with the flag **-w**
 
 ### -wi flag (Information)
 
+```console
+# > nrun -w -wi https://www.google.com
+URL: https://www.google.com
+Method: GET
+Status: 200 OK
+Size: 14377 bytes
+Time: 253 ms
+X-Auth-Token:
+
+Headers:
+  X-Frame-Options: SAMEORIGIN
+  Content-Type: text/html; charset=ISO-8859-1
+  P3p: CP="This is not a P3P policy! See g.co/p3phelp for more info."
+  Server: gws
+  Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+  Expires: -1
+  Set-Cookie: SOCS=CAAaBgiA75CfBg; expires=Sun, 10-Mar-2024 19:37:54 GMT; path=/; domain=.google.com; Secure; SameSite=lax, AEC=ARSKqsI2T2AbLdMVdP0j8HonQZPuoyY3UGeWnrcs3c5UBboXdqhUtVH6ayA; expires=Tue, 08-Aug-2023 19:37:54 GMT; path=/; domain=.google.com; Secure; HttpOnly; SameSite=lax, __Secure-ENID=10.SE=Kg5dkXE-AXZ7Jj_Ce2kPXxVnOlX-7F05NDWN5nzXUo3EFKPHqAuhWbaFYCpFHY5a_r1Yu8QeGr8iBacHGyD-Rntknn7Sj-jG_R2M5Y0kPjjwGQAGuWmIsf6UYsWUcHUn8feDYyfBpULa-mJ-cCnUE-WJrZGYcugaAmXTUfQUo4E; expires=Mon, 11-Mar-2024 11:56:12 GMT; path=/; domain=.google.com; Secure; HttpOnly; SameSite=lax, CONSENT=PENDING+682; expires=Sat, 08-Feb-2025 19:37:54 GMT; path=/; domain=.google.com; Secure
+  Cache-Control: private, max-age=0
+  X-Xss-Protection: 0
+  Date: Thu, 09 Feb 2023 19:37:54 GMT
+Cookies:
+  SOCS: CAAaBgiA75CfBg
+  AEC: ARSKqsI2T2AbLdMVdP0j8HonQZPuoyY3UGeWnrcs3c5UBboXdqhUtVH6ayA
+  __Secure-ENID: 10.SE=Kg5dkXE-AXZ7Jj_Ce2kPXxVnOlX-7F05NDWN5nzXUo3EFKPHqAuhWbaFYCpFHY5a_r1Yu8QeGr8iBacHGyD-Rntknn7Sj-jG_R2M5Y0kPjjwGQAGuWmIsf6UYsWUcHUn8feDYyfBpULa-mJ-cCnUE-WJrZGYcugaAmXTUfQUo4E
+  CONSENT: PENDING+682
+```
 ### -wt flag (Template)
 
 ### -wh flag (Headers)
@@ -517,12 +543,12 @@ Web requests can be done with the flag **-w**
 ## Makefile
 There are some predefined targets in the Makefile that can be used to build and install the tool.
 
-```bash
+```console
 # > make local
 ```
 This will build the tool and place it in the current directory. It will also cross compile the tool for windows, linux and darwin. These files will be found in the bin directory.
 
-```bash
+```console
 # > make util
 ```
 This will build the tool and move it to the ~/Utils directory. This is my preferred location for tools I use myself. So if you don't have a ~/Utils directory you'll either have to create it or skip using this target.
@@ -539,12 +565,12 @@ This list is subject to change.
 
 The cross compilations doesn't include any code signing or notarization. So if you want to use the cross compiled binaries on a mac you'll have to sign and notarize them yourself.
 
-```bash
+```console
 # > make go
 ```
 This will build the tool and move it to the ~/go/bin directory. If you don't have a ~/go/bin directory or you have your go binaries somewhere else you'll either have to create it or skip using this target.
 
-```bash
+```console
 # > make all
 ```
 This will create all the targets.
@@ -561,27 +587,27 @@ The filter is case-insensitive and will match if the parameter is a substring of
 
 To show the name of all licenses for the project you can use the -L flag with "names" as the parameter
 .
-```bash
+```console
 # > nrun -L
 ```
 This will show the packages licenses for the project.
 
-```bash
+```console
 # > nrun -L MIT
 ```
 This will show the packages that are under the MIT license.
 
-```bash
+```console
 # > nrun -L MIT ISC
 ```
 This will show the packages that are under the MIT or ISC license.
 
-```bash
+```console
 # > nrun -L names
 ```
 This will show the license names that are used by packages in the project.
 
-```bash
+```console
 # > nrun -L bs
 ```
 The search is case-insensitive and searches for substrings so this will show the packages that are under the different BSD license.
