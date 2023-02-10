@@ -23,12 +23,13 @@ type Config struct {
 }
 
 type WebGetTemplateStruct struct {
-	Method     string            `json:"method"`
-	URL        string            `json:"url"`
-	Format     string            `json:"format"`
-	Body       string            `json:"body"`
-	Headers    map[string]string `json:"headers"`
-	XAuthToken string            `json:xauthtoken`
+	Method     string                 `json:"method"`
+	URL        string                 `json:"url"`
+	Format     string                 `json:"format"`
+	Body       string                 `json:"body"`
+	Headers    map[string]string      `json:"headers"`
+	XAuthToken string                 `json:"xauthtoken"`
+	Flags      map[string]interface{} `json:"flags"`
 }
 
 type LicenseList map[string][]string

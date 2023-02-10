@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.18.0**
+**Current version is v0.18.1**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -16,27 +16,27 @@ It's also much easier to map your most used command to shorter ones that are eas
 
 So if you have to type something like
 ```console
-# > npm run test:coverage:localhost
+foo@bar:~$ npm run test:coverage:localhost
 ```
 every time you want to run your tests. Then it would be easier to use nrun and type
 ```console
-# > nrun test:coverage:localhost
+foo@bar:~$ nrun test:coverage:localhost
 ```
 And by using shortcuts in .nrun.json you might shorten this even more to
 ```console
-# > nrun test
+foo@bar:~$ nrun test
 ```
 or something else that is easier to remember and faster to type.
 
 And if you're not sure on which scripts there are available you can easily type
 ```console
-# > nrun
+foo@bar:~$ nrun
 ```
 and all the available scripts will be printed out in a list.
 
 If you want to know what a certain script does you can write
 ```console
-# > nrun -s test:coverage:localhost
+foo@bar:~$ nrun -s test:coverage:localhost
 ```
 and the command that this script runs will be printed out.
 
@@ -185,10 +185,10 @@ Please note that this is not the behavior in npm.
 
 ## Installation
 ```console
-# > git clone git@github.com:codedeviate/nrun.git
-# > cd nrun
-# > go install
-# > go build -o nrun main.go
+foo@bar:~$ git clone git@github.com:codedeviate/nrun.git
+foo@bar:~$ cd nrun
+foo@bar:~$ go install
+foo@bar:~$ go build -o nrun main.go
 ```
 
 ### Dependencies
@@ -317,57 +317,57 @@ Global section names are "\*" for mapping values and "\*" for environment values
 ```
 Now you can be in any project directory and type
 ```console
-# > nrun test
+foo@bar:~$ nrun test
 ```
 which is the equivalent to
 ```console
-# > PORT=3009 npm run test:coverage:localhost
+foo@bar:~$ PORT=3009 npm run test:coverage:localhost
 ```
 
 If you are in a different path than you project then you can use the -p flag to specify the path to the project.
 ```console
-# > nrun -p nruntest test
+foo@bar:~$ nrun -p nruntest test
 ```
 This is the same as
 ```console
-# > cd /Users/codedeviate/Development/nruntest
-# > nrun test
+foo@bar:~$ cd /Users/codedeviate/Development/nruntest
+foo@bar:~$ nrun test
 ```
 
 
 ```console
-# > nrun -p /Users/codedeviate/Development/nruntest test
+foo@bar:~$ nrun -p /Users/codedeviate/Development/nruntest test
 ```
 
 
 ## Different ways to use nrun
 ### You want to run a script that is located in another project
 ```console
-# > nrun -p proj1 test
+foo@bar:~$ nrun -p proj1 test
 ```
 
 ### You have a project that is your main project that you want to use as your default project
 Set the environment variable NRUNPROJECT to the name of the project.
 ```console
-# > nrun test
+foo@bar:~$ nrun test
 ```
 This will list all scripts in your default project.
 
 If you have a default project defined but want to use nrun in the local directory you'll have to use the -p flag.
 ```console
-# > nrun -p .
+foo@bar:~$ nrun -p .
 ```
 This will list all scripts in your local directory.
 
 If you want to execute a command in another project you can use the -e flag and the -p flag.
 ```console
-# > nrun -p proj1 -e ls
+foo@bar:~$ nrun -p proj1 -e ls
 ```
 This will list all files in the proj1 directory.
 
 Or a more realistic example.
 ```console
-# > nrun -p proj1 -e -- git commit -am "Some commit message"
+foo@bar:~$ nrun -p proj1 -e -- git commit -am "Some commit message"
 ```
 This will commit all changes in the proj1 directory.
 
@@ -493,15 +493,17 @@ nrun has a built-in web request function that can be used to do web requests.
 Web requests can be done with the flag **-w**
 
 ```console
-# > nrun -w https://www.google.com
+foo@bar:~$ nrun -w https://www.google.com
 ```
 
 ### -w flag
+Perform a web request.
 
 ### -wi flag (Information)
+Print the information and headers for a web request.
 
 ```console
-# > nrun -w -wi https://www.google.com
+foo@bar:~$ nrun -w -wi https://www.google.com
 URL: https://www.google.com
 Method: GET
 Status: 200 OK
@@ -544,12 +546,12 @@ Cookies:
 There are some predefined targets in the Makefile that can be used to build and install the tool.
 
 ```console
-# > make local
+foo@bar:~$ make local
 ```
 This will build the tool and place it in the current directory. It will also cross compile the tool for windows, linux and darwin. These files will be found in the bin directory.
 
 ```console
-# > make util
+foo@bar:~$ make util
 ```
 This will build the tool and move it to the ~/Utils directory. This is my preferred location for tools I use myself. So if you don't have a ~/Utils directory you'll either have to create it or skip using this target.
 
@@ -566,12 +568,12 @@ This list is subject to change.
 The cross compilations doesn't include any code signing or notarization. So if you want to use the cross compiled binaries on a mac you'll have to sign and notarize them yourself.
 
 ```console
-# > make go
+foo@bar:~$ make go
 ```
 This will build the tool and move it to the ~/go/bin directory. If you don't have a ~/go/bin directory or you have your go binaries somewhere else you'll either have to create it or skip using this target.
 
 ```console
-# > make all
+foo@bar:~$ make all
 ```
 This will create all the targets.
 
@@ -588,27 +590,27 @@ The filter is case-insensitive and will match if the parameter is a substring of
 To show the name of all licenses for the project you can use the -L flag with "names" as the parameter
 .
 ```console
-# > nrun -L
+foo@bar:~$ nrun -L
 ```
 This will show the packages licenses for the project.
 
 ```console
-# > nrun -L MIT
+foo@bar:~$ nrun -L MIT
 ```
 This will show the packages that are under the MIT license.
 
 ```console
-# > nrun -L MIT ISC
+foo@bar:~$ nrun -L MIT ISC
 ```
 This will show the packages that are under the MIT or ISC license.
 
 ```console
-# > nrun -L names
+foo@bar:~$ nrun -L names
 ```
 This will show the license names that are used by packages in the project.
 
 ```console
-# > nrun -L bs
+foo@bar:~$ nrun -L bs
 ```
 The search is case-insensitive and searches for substrings so this will show the packages that are under the different BSD license.
 

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.18.0"
+const Version = "0.18.1"
 
 func main() {
 	originalWorkingDir, _ := os.Getwd()

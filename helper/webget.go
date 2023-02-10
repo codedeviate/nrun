@@ -102,6 +102,26 @@ func WebGetTemplate(args []string, flagList *FlagList) {
 		*flagList.WebGetFormat = template.Format
 	}
 
+	if template.Flags != nil {
+		if template.Flags["wi"] != nil {
+			*flagList.WebGetInformation = template.Flags["wi"].(bool)
+		}
+		if template.Flags["wh"] != nil {
+			*flagList.WebGetHeader = template.Flags["wh"].(bool)
+		}
+		if template.Flags["who"] != nil {
+			*flagList.WebGetHeaderOnly = template.Flags["who"].(bool)
+		}
+		if template.Flags["wnb"] != nil {
+			*flagList.WebGetNoBody = template.Flags["wnb"].(bool)
+		}
+		if template.Flags["wm"] != nil {
+			*flagList.WebGetMethod = template.Flags["wm"].(string)
+		}
+		if template.Flags["wf"] != nil {
+			*flagList.WebGetFormat = template.Flags["wf"].(string)
+		}
+	}
 	ProcessWebRequest(flagList, template.URL, template.Method, template.Body, template.Headers, requestStart)
 }
 
