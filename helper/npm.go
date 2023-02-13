@@ -138,9 +138,7 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			cmd.Stderr = os.Stderr
 
 			runErr := cmd.Run()
-			for i, s := range cmd.Environ() {
-				fmt.Println(i, s)
-			}
+
 			if runErr != nil {
 				log.Println(runErr)
 				return
