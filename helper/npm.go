@@ -41,11 +41,13 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			}
 			cmd := exec.Command(shell, args...)
 
+			cmdEnv := cmd.Environ()
+
 			if flagList.NoDefaultValues == nil || *flagList.NoDefaultValues == false {
 				if len(envs[script]) > 0 {
 					envParts, _ := shlex.Split(envs[script])
 					for _, part := range envParts {
-						cmd.Env = append(cmd.Environ(), part)
+						cmdEnv = append(cmdEnv, part)
 					}
 					if *flagList.BeVerbose {
 						fmt.Println("============================================================")
@@ -69,7 +71,7 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			// Add node_modules/.bin to path if it exists
 			node_bin_modules := path + "/node_modules/.bin"
 			if IsDir(node_bin_modules) {
-				cmd.Env = append(cmd.Environ(), "PATH="+node_bin_modules+":"+os.Getenv("PATH"))
+				cmdEnv = append(cmdEnv, "PATH="+node_bin_modules+":"+os.Getenv("PATH"))
 			}
 
 			// Add npm root -g to path if it exists (for global npm packages)
@@ -77,7 +79,7 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			npmRootGCmdPathBytes, _ := npmRootGCmd.Output()
 			npmRootGCmdPath := strings.Trim(string(npmRootGCmdPathBytes), " \n")
 			if len(npmRootGCmdPath) > 0 && IsDir(npmRootGCmdPath) {
-				cmd.Env = append(cmd.Environ(), "PATH="+npmRootGCmdPath+":"+os.Getenv("PATH"))
+				cmdEnv = append(cmdEnv, "PATH="+npmRootGCmdPath+":"+os.Getenv("PATH"))
 			}
 
 			if *flagList.XAuthToken != "" {
@@ -86,52 +88,50 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 				config, err := ReadConfig(dir + "/.nrun.json")
 				if err == nil {
 					if config.XAuthTokens[*flagList.XAuthToken] != "" {
-						cmd.Env = append(cmd.Environ(), "X_AUTH_TOKEN="+config.XAuthTokens[*flagList.XAuthToken])
+						cmdEnv = append(cmdEnv, "X_AUTH_TOKEN="+config.XAuthTokens[*flagList.XAuthToken])
 					} else {
-						cmd.Env = append(cmd.Environ(), "X_AUTH_TOKEN="+*flagList.XAuthToken)
+						cmdEnv = append(cmdEnv, "X_AUTH_TOKEN="+*flagList.XAuthToken)
 					}
 				} else {
-					cmd.Env = append(cmd.Environ(), "X_AUTH_TOKEN="+*flagList.XAuthToken)
+					cmdEnv = append(cmdEnv, "X_AUTH_TOKEN="+*flagList.XAuthToken)
 				}
 			}
 			scriptNice := strings.Replace(script, ":", "_", -1)
+			// Split this before we add it?
 			if len(envs[scriptNice]) > 0 {
-				cmd.Env = append(cmd.Environ(), envs[scriptNice])
+				cmdEnv = append(cmdEnv, envs[scriptNice])
 			}
 
 			// Manage overrides for env
 			newEnv := []string{}
-			overrides := []string{}
 			overrideKeys := []string{}
-			for _, envValue := range cmd.Env {
+			for _, envValue := range cmdEnv {
 				if strings.HasPrefix(envValue, "OVERRIDE_") {
 					newValue := strings.Replace(envValue, "OVERRIDE_", "", 1)
 					overrideKeys = append(overrideKeys, strings.Split(newValue, "=")[0])
-					overrides = append(overrides, newValue)
-				} else {
-					newEnv = append(newEnv, envValue)
+					newEnv = append(newEnv, newValue)
 				}
 			}
-			for _, overrideKey := range overrideKeys {
-				for i := 0; i < len(newEnv); i++ {
-					envValue := newEnv[i]
-					if strings.HasPrefix(envValue, overrideKey+"=") {
-						newEnv = append(newEnv[:i], newEnv[i+1:]...)
-						i--
-					}
+
+			finalEnv := []string{}
+			for _, envValue := range cmdEnv {
+				envKey := strings.Split(envValue, "=")[0]
+				if !Contains(overrideKeys, envKey) {
+					finalEnv = append(finalEnv, envValue)
 				}
 			}
-			newEnv = append(newEnv, overrides...)
-			cmd.Env = newEnv
+			finalEnv = append(finalEnv, newEnv...)
+
 			if flagList.BeVerbose != nil && *flagList.BeVerbose {
-				if len(overrides) > 0 {
+				if len(newEnv) > 0 {
 					fmt.Println("============================================================")
-					for _, override := range overrides {
+					for _, override := range newEnv {
 						fmt.Println("Overridden", override)
 					}
 					fmt.Println("============================================================")
 				}
 			}
+			cmd.Env = finalEnv
 
 			cmd.Stdout = os.Stdout
 			cmd.Stdin = os.Stdin
