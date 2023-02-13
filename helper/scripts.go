@@ -1,8 +1,6 @@
 package helper
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 func ExecuteScriptList(script string, scripts map[string][]string, args []string, projects map[string]string, flagList *FlagList) {
@@ -33,6 +32,48 @@ func ExecuteScriptList(script string, scripts map[string][]string, args []string
 	}
 }
 
+func ScriptRunner(scripts []string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for _, script := range scripts {
+		shell, shellErr := GetShell()
+		if shellErr != nil {
+			log.Println("Error:", shellErr)
+			return
+		}
+		cmd := exec.Command(shell, append([]string{"-c", script})...)
+
+		cmd.Stdout = os.Stdout
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+
+		runErr := cmd.Run()
+		if runErr != nil {
+			log.Println(runErr)
+			return
+		}
+	}
+}
+
+func ExecuteMultipleScripts(scripts []string, flagList *FlagList) {
+	usr, _ := user.Current()
+	homeDir := usr.HomeDir
+	config, _ := ReadConfig(homeDir + "/.nrun.json")
+	ApplyVarsArray(config.Scripts, config.Vars)
+	var wg sync.WaitGroup
+	for _, script := range scripts {
+		if flagList.BeVerbose != nil && *flagList.BeVerbose {
+			fmt.Println("Executing script", script)
+		}
+		if len(config.Scripts[script]) > 0 {
+			go ScriptRunner(config.Scripts[script], &wg)
+			wg.Add(1)
+		} else {
+			log.Println("No script found for command", script)
+		}
+	}
+	wg.Wait()
+}
+
 func ExecuteScripts(path string, scriptName string, scripts []string, args []string, flagList *FlagList) {
 	if flagList.BeVerbose != nil && *flagList.BeVerbose {
 		fmt.Println("Executing script", "\""+scriptName+"\"", "in", path)
@@ -45,6 +86,7 @@ func ExecuteScripts(path string, scriptName string, scripts []string, args []str
 			}
 			if len(script) > 2 {
 				if script[0:2] == "@@" {
+					doContinue := true
 					script = script[2:]
 					negate := false
 					if len(script) > 0 && script[0] == '!' {
@@ -144,7 +186,9 @@ func ExecuteScripts(path string, scriptName string, scripts []string, args []str
 						log.Println("Invalid command:", script)
 						return
 					}
-					continue
+					if doContinue {
+						continue
+					}
 				}
 			}
 			shell, shellErr := GetShell()
@@ -238,90 +282,54 @@ func ListExecutableScripts(scripts map[string][]string, flagList *FlagList) {
 func AddToExecutableScript(args []string, flagList *FlagList) {
 	usr, _ := user.Current()
 	dir := usr.HomeDir
-	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
-		jsonFile, err := os.Open(dir + "/.nrun.json")
+	config, err := ReadConfig(dir + "/.nrun.json")
+	err = CopyFile(dir+"/.nrun.json", dir+"/.nrun.json.bak")
+	if err != nil {
+		log.Println("Failed with", err)
+	} else {
+		var commands []string
+		if config.Scripts != nil && config.Scripts[*flagList.AddToExecutableScript] != nil {
+			commands = config.Scripts[*flagList.AddToExecutableScript]
+		}
+		commands = append(commands, strings.Join(args, " "))
+		config.Scripts[*flagList.AddToExecutableScript] = commands
+		err := WriteConfig(dir+"/.nrun.json", config)
 		if err != nil {
 			log.Println("Failed with", err)
-		} else {
-			byteValue, _ := os.ReadFile(jsonFile.Name())
-			var config Config
-			_ = json.Unmarshal(byteValue, &config)
-			jsonFile.Close()
-			err = CopyFile(jsonFile.Name(), jsonFile.Name()+".bak")
-			if err != nil {
-				log.Println("Failed with", err)
-			} else {
-				var commands []string
-				if config.Scripts != nil && config.Scripts[*flagList.AddToExecutableScript] != nil {
-					commands = config.Scripts[*flagList.AddToExecutableScript]
-				}
-				commands = append(commands, strings.Join(args, " "))
-				config.Scripts[*flagList.AddToExecutableScript] = commands
-				jsonFile, err := os.Create(jsonFile.Name())
-				if err != nil {
-					log.Println("Failed with", err)
-				} else {
-					defer func(jsonFile *os.File) {
-						err := jsonFile.Close()
-						if err != nil {
-							log.Println("Failed with", err)
-						}
-					}(jsonFile)
-					jsonData, _ := json.MarshalIndent(config, "", "  ")
-					_, err = jsonFile.Write(jsonData)
-					if err != nil {
-						log.Println("Failed with", err)
-					}
-					log.Println("Command added to the executable script", "\""+*flagList.AddToExecutableScript+"\"")
-				}
-			}
+			return
 		}
+		log.Println("Command added to the executable script", "\""+*flagList.AddToExecutableScript+"\"")
 	}
 }
 
 func RemoveExecutableScript(script string, args []string) {
 	usr, _ := user.Current()
 	dir := usr.HomeDir
-	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
-		jsonFile, err := os.Open(dir + "/.nrun.json")
-		if err != nil {
-			log.Println("Failed with", err)
+	config, err := ReadConfig(dir + "/.nrun.json")
+
+	err = CopyFile(dir+"/.nrun.json", dir+"/.nrun.json.bak")
+	if err != nil {
+		log.Println("Failed with", err)
+	} else {
+		if config.Scripts[script] == nil {
+			log.Println("The script \"" + script + "\" doesn't exist")
+			if len(args) > 0 {
+				script = args[0]
+				args = args[1:]
+				RemoveExecutableScript(script, args)
+			}
 		} else {
-			byteValue, _ := os.ReadFile(jsonFile.Name())
-			var config Config
-			_ = json.Unmarshal(byteValue, &config)
-			jsonFile.Close()
-			err = CopyFile(jsonFile.Name(), jsonFile.Name()+".bak")
+			delete(config.Scripts, script)
+			err := WriteConfig(dir+"/.nrun.json", config)
 			if err != nil {
 				log.Println("Failed with", err)
-			} else {
-				if config.Scripts[script] == nil {
-					log.Println("The script \"" + script + "\" doesn't exist")
-					if len(args) > 0 {
-						script = args[0]
-						args = args[1:]
-						RemoveExecutableScript(script, args)
-					}
-				} else {
-					delete(config.Scripts, script)
-					jsonFile, err := os.Create(jsonFile.Name())
-					if err != nil {
-						log.Println("Failed with", err)
-					} else {
-						defer jsonFile.Close()
-						jsonData, _ := json.MarshalIndent(config, "", "  ")
-						_, err = jsonFile.Write(jsonData)
-						if err != nil {
-							log.Println("Failed with", err)
-						}
-						log.Println("Executable script \"" + script + "\" has been removed")
-						if len(args) > 0 {
-							script = args[0]
-							args = args[1:]
-							RemoveExecutableScript(script, args)
-						}
-					}
-				}
+				return
+			}
+			log.Println("Executable script \"" + script + "\" has been removed")
+			if len(args) > 0 {
+				script = args[0]
+				args = args[1:]
+				RemoveExecutableScript(script, args)
 			}
 		}
 	}

@@ -16,7 +16,9 @@ type PackageJSON struct {
 type Config struct {
 	Env             map[string]map[string]string    `json:"env"`
 	Path            map[string]map[string]string    `json:"path"`
+	Vars            map[string]string               `json:"vars"`
 	Projects        map[string]string               `json:"projects"`
+	Alias           map[string]string               `json:"alias"`
 	Scripts         map[string][]string             `json:"scripts"`
 	WebGetTemplates map[string]WebGetTemplateStruct `json:"webget"`
 	XAuthTokens     map[string]string               `json:"xauthtokens"`
@@ -34,6 +36,7 @@ type WebGetTemplateStruct struct {
 
 type LicenseList map[string][]string
 type FlagList struct {
+	ExecuteAlias             *bool
 	NoDefaultValues          *bool
 	ShowScript               *bool
 	ShowHelp                 *bool
@@ -43,6 +46,7 @@ type FlagList struct {
 	DummyCode                *bool
 	UseAnotherPath           *string
 	UsedPath                 string
+	OriginalPath             string
 	ShowCurrentProjectInfo   *bool
 	AddProject               *bool
 	RemoveProject            *bool
@@ -53,6 +57,7 @@ type FlagList struct {
 	ExecuteCommand           *bool
 	ExecuteCommandInProjects *bool
 	ExecuteScript            *bool
+	ExecuteMultipleScripts   *bool
 	ExecuteScriptInProjects  *bool
 	ListExecutableScripts    *bool
 	ShowExecutableScript     *string
@@ -65,10 +70,12 @@ type FlagList struct {
 	WebGetHeaderOnly         *bool
 	WebGetNoBody             *bool
 	WebGetInformation        *bool
+	WebGetAll                *bool
 	WebGetMethod             *string
 	WebGetFormat             *string
 	XAuthToken               *string
 	TestAlarm                *int64 // Time in milliseconds. Currently not used
+	Vars                     map[string]string
 }
 
 type Memory struct {

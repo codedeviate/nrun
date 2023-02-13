@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+	"github.com/google/shlex"
 	"log"
 	"os"
 	"os/exec"
@@ -11,7 +12,14 @@ import (
 )
 
 func RunNPM(packageJSON PackageJSON, path string, script string, args []string, envs map[string]string, flagList *FlagList, Version string) {
-	fmt.Println("Running", script, "in", path, "with args", strings.Join(args, ","))
+	if flagList.BeVerbose != nil && *flagList.BeVerbose {
+		fmt.Print("Running ", script, " in ", path, " with ")
+		if len(args) > 0 {
+			fmt.Println("args", strings.Join(args, ","))
+		} else {
+			fmt.Println("no args")
+		}
+	}
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
 			if len(packageJSON.Scripts["pre"+script]) > 0 {
@@ -35,6 +43,10 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 
 			if flagList.NoDefaultValues == nil || *flagList.NoDefaultValues == false {
 				if len(envs[script]) > 0 {
+					envParts, _ := shlex.Split(envs[script])
+					for _, part := range envParts {
+						cmd.Env = append(cmd.Environ(), part)
+					}
 					if *flagList.BeVerbose {
 						fmt.Println("============================================================")
 						fmt.Println("Adding environment:", envs[script])
@@ -43,7 +55,6 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 						}
 						fmt.Println("============================================================")
 					}
-					cmd.Env = append(cmd.Environ(), envs[script])
 				} else {
 					if *flagList.BeVerbose {
 						if flagList.UsedPath != "" {
@@ -52,7 +63,6 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 							fmt.Println("============================================================")
 						}
 					}
-					cmd.Env = append(cmd.Environ(), envs[script])
 				}
 			}
 
@@ -88,11 +98,49 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			if len(envs[scriptNice]) > 0 {
 				cmd.Env = append(cmd.Environ(), envs[scriptNice])
 			}
+
+			// Manage overrides for env
+			newEnv := []string{}
+			overrides := []string{}
+			overrideKeys := []string{}
+			for _, envValue := range cmd.Env {
+				if strings.HasPrefix(envValue, "OVERRIDE_") {
+					newValue := strings.Replace(envValue, "OVERRIDE_", "", 1)
+					overrideKeys = append(overrideKeys, strings.Split(newValue, "=")[0])
+					overrides = append(overrides, newValue)
+				} else {
+					newEnv = append(newEnv, envValue)
+				}
+			}
+			for _, overrideKey := range overrideKeys {
+				for i := 0; i < len(newEnv); i++ {
+					envValue := newEnv[i]
+					if strings.HasPrefix(envValue, overrideKey+"=") {
+						newEnv = append(newEnv[:i], newEnv[i+1:]...)
+						i--
+					}
+				}
+			}
+			newEnv = append(newEnv, overrides...)
+			cmd.Env = newEnv
+			if flagList.BeVerbose != nil && *flagList.BeVerbose {
+				if len(overrides) > 0 {
+					fmt.Println("============================================================")
+					for _, override := range overrides {
+						fmt.Println("Overridden", override)
+					}
+					fmt.Println("============================================================")
+				}
+			}
+
 			cmd.Stdout = os.Stdout
 			cmd.Stdin = os.Stdin
 			cmd.Stderr = os.Stderr
 
 			runErr := cmd.Run()
+			for i, s := range cmd.Environ() {
+				fmt.Println(i, s)
+			}
 			if runErr != nil {
 				log.Println(runErr)
 				return

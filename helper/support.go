@@ -40,76 +40,77 @@ func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
 	return &packageJSON, path, nil
 }
 
-func GetDefaultValues(path string) (map[string]string, map[string]string, map[string]string, map[string][]string) {
+func GetDefaultValues(path string) (map[string]string, map[string]string, map[string]string, map[string][]string, map[string]string) {
 	defaults := make(map[string]string, 1000)
 	defaultEnvs := make(map[string]string, 1000)
 	projects := make(map[string]string, 1000)
 	scripts := make(map[string][]string, 1000)
+	vars := make(map[string]string, 1000)
+
 	usr, _ := user.Current()
 	dir := usr.HomeDir
-	if _, err := os.Stat(dir + "/.nrun.json"); !errors.Is(err, os.ErrNotExist) {
-		jsonFile, err := os.Open(dir + "/.nrun.json")
-		if err != nil {
-			log.Println("Failed with", err)
-		} else {
-			defer jsonFile.Close()
-			byteValue, _ := os.ReadFile(jsonFile.Name())
-			var config Config
-			_ = json.Unmarshal(byteValue, &config)
-			for k, v := range config.Path["*"] {
-				defaults[k] = v
-			}
-			for k, v := range config.Path[path] {
-				defaults[k] = v
-			}
-			for k, v := range config.Env["*"] {
-				defaultEnvs[k] = v
-			}
-			for k, v := range config.Env[path] {
-				defaultEnvs[k] = v
-			}
-			for k, v := range config.Projects {
-				projects[k] = v
-			}
-			for k, v := range config.Scripts {
-				scripts[k] = v
-			}
+	config, err := ReadConfig(dir + "/.nrun.json")
+	if err != nil {
+		if err.Error() != "config file not found" {
+			log.Println("Failed global .nrun.json with", err)
+		}
+	} else {
+		for k, v := range config.Path["*"] {
+			defaults[k] = v
+		}
+		for k, v := range config.Path[path] {
+			defaults[k] = v
+		}
+		for k, v := range config.Env["*"] {
+			defaultEnvs[k] = v
+		}
+		for k, v := range config.Env[path] {
+			defaultEnvs[k] = v
+		}
+		for k, v := range config.Vars {
+			vars[k] = v
+		}
+		for k, v := range config.Projects {
+			projects[k] = v
+		}
+		for k, v := range config.Scripts {
+			scripts[k] = v
 		}
 	}
 
 	if path == "" {
-		return defaults, defaultEnvs, projects, scripts
+		return defaults, defaultEnvs, projects, scripts, vars
 	}
-	if _, err := os.Stat("./.nrun.json"); !errors.Is(err, os.ErrNotExist) {
-		jsonFile, err := os.Open("./.nrun.json")
-		if err != nil {
-			log.Println("Failed with", err)
-		} else {
-			defer jsonFile.Close()
-			byteValue, _ := os.ReadFile(jsonFile.Name())
-			var config Config
-			_ = json.Unmarshal(byteValue, &config)
-			for k, v := range config.Path["*"] {
-				defaults[k] = v
-			}
-			for k, v := range config.Path[path] {
-				defaults[k] = v
-			}
-			for k, v := range config.Env["*"] {
-				defaultEnvs[k] = v
-			}
-			for k, v := range config.Env[path] {
-				defaultEnvs[k] = v
-			}
+	config, err = ReadConfig("./.nrun.json")
+	if err != nil {
+		if err.Error() != "config file not found" {
+			log.Println("Failed local .nrun.json with", err)
+		}
+	} else {
+		for k, v := range config.Path["*"] {
+			defaults[k] = v
+		}
+		for k, v := range config.Path[path] {
+			defaults[k] = v
+		}
+		for k, v := range config.Env["*"] {
+			defaultEnvs[k] = v
+		}
+		for k, v := range config.Env[path] {
+			defaultEnvs[k] = v
+		}
+		for k, v := range config.Vars {
+			vars[k] = v
 		}
 	}
 
-	return defaults, defaultEnvs, projects, scripts
+	return defaults, defaultEnvs, projects, scripts, vars
 }
 
 func ParseFlags() *FlagList {
 	var flagList *FlagList
 	flagList = new(FlagList)
+	flagList.ExecuteAlias = flag.Bool("a", false, "Execute an alias")
 	flagList.NoDefaultValues = flag.Bool("D", false, "Do not use default values")
 	flagList.ShowScript = flag.Bool("s", false, "Show the script")
 	flagList.ShowHelp = flag.Bool("h", false, "Show help")
@@ -128,6 +129,7 @@ func ParseFlags() *FlagList {
 	flagList.ExecuteCommand = flag.Bool("e", false, "Execute a command")
 	flagList.ExecuteCommandInProjects = flag.Bool("ep", false, "Execute a command in all projects")
 	flagList.ExecuteScript = flag.Bool("x", false, "Execute a script")
+	flagList.ExecuteMultipleScripts = flag.Bool("xm", false, "Execute multiple scripts")
 	flagList.ExecuteScriptInProjects = flag.Bool("xp", false, "Execute a script in all projects")
 	flagList.ListExecutableScripts = flag.Bool("xl", false, "List all executable scripts")
 	flagList.ShowExecutableScript = flag.String("xs", "", "Show an executable script")
@@ -142,6 +144,7 @@ func ParseFlags() *FlagList {
 	flagList.WebGetInformation = flag.Bool("wi", false, "Show information about the web response")
 	flagList.WebGetMethod = flag.String("wm", "", "Set the method to use for the web request")
 	flagList.WebGetFormat = flag.String("wf", "", "Set the format for the web request")
+	flagList.WebGetAll = flag.Bool("wa", false, "Get information, headers and body for the web response")
 	flagList.XAuthToken = flag.String("xat", "", "Set the X-AUTH-TOKEN to use")
 	// Inactive flags
 	flagList.TestAlarm = flag.Int64("t", 0, "Measure times in tests and notify when they are too long (time given in milliseconds)")
@@ -259,7 +262,31 @@ func GetShellByMagic(key string) (string, error) {
 	return "", errors.New("shell not found")
 }
 
+var configCache = make(map[string]*Config, 100)
+
+func WriteConfig(filename string, config *Config) error {
+	configCache[filename] = config
+	jsonFile, err := os.Create(filename)
+	if err != nil {
+		return err
+	} else {
+		jsonData, _ := json.MarshalIndent(config, "", "  ")
+		_, err = jsonFile.Write(jsonData)
+		if err != nil {
+			return err
+		}
+		err := jsonFile.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ReadConfig(filepath string) (*Config, error) {
+	if configCache[filepath] != nil {
+		return configCache[filepath], nil
+	}
 	if !FileExists(filepath) {
 		return nil, errors.New("config file not found")
 	}
@@ -278,8 +305,64 @@ func ReadConfig(filepath string) (*Config, error) {
 			var config Config
 			_ = json.Unmarshal(byteValue, &config)
 			jsonFile.Close()
+			configCache[filepath] = &config
 			return &config, nil
 		}
 	}
 	return nil, err
+}
+
+func ProcessVarsOnString(data []byte, vars map[string]string) []byte {
+	for key, value := range vars {
+		data = []byte(strings.Replace(string(data), "{{"+key+"}}", value, -1))
+	}
+	return data
+}
+func ApplyVars(data map[string]string, vars map[string]string) map[string]string {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return data
+	}
+
+	jsonData = ProcessVarsOnString(jsonData, vars)
+
+	err = json.Unmarshal(jsonData, &data)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return data
+	}
+	return data
+}
+func ApplyVarsArray(data map[string][]string, vars map[string]string) map[string][]string {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return data
+	}
+
+	jsonData = ProcessVarsOnString(jsonData, vars)
+
+	err = json.Unmarshal(jsonData, &data)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return data
+	}
+	return data
+}
+func ApplyVarsTemplateStruct(data WebGetTemplateStruct, vars map[string]string) WebGetTemplateStruct {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return data
+	}
+
+	jsonData = ProcessVarsOnString(jsonData, vars)
+
+	err = json.Unmarshal(jsonData, &data)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return data
+	}
+	return data
 }

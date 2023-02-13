@@ -7,27 +7,32 @@ import (
 	"log"
 	"nrun/helper"
 	"os"
+	"os/user"
 	"time"
 )
 
 const Version = "0.18.1"
 
 func main() {
-	originalWorkingDir, _ := os.Getwd()
+	originalPath, _ := os.Getwd()
 	flagList := helper.ParseFlags()
 	timeStarted := time.Now()
 
+	//// Process any aliases first
+	//config, _ := helper.ReadConfig(dir + "/.nrun.json")
+	//aliasExecuted := false
+	//for _, key := range os.Args[1:] {
+	//	if config.Alias[key] != "" {
+	//		helper.ExecuteAlias(config.Alias[key])
+	//		aliasExecuted = true
+	//	}
+	//}
+	//if aliasExecuted {
+	//	return
+	//}
+
+	// Parse command line flags
 	args := flag.Args()
-
-	if flagList.WebGetTemplate != nil && len(*flagList.WebGetTemplate) > 0 {
-		helper.WebGetTemplate(args, flagList)
-		return
-	}
-
-	if flagList.WebGet != nil && *flagList.WebGet {
-		helper.WebGet(args, flagList)
-		return
-	}
 
 	var script string
 	if len(args) > 0 {
@@ -108,7 +113,7 @@ func main() {
 	}
 
 	if *flagList.UseAnotherPath != "" {
-		_, _, projects, _ := helper.GetDefaultValues("")
+		_, _, projects, _, _ := helper.GetDefaultValues("")
 		path = *flagList.UseAnotherPath
 		if _, ok := projects[path]; ok {
 			path = projects[path]
@@ -120,7 +125,15 @@ func main() {
 		os.Chdir(path)
 	}
 	packageJSON, path, processErr := helper.ProcessPath(path)
-	defaultValues, defaultEnvironment, projects, scripts := helper.GetDefaultValues(path)
+	defaultValues, defaultEnvironment, projects, scripts, vars := helper.GetDefaultValues(path)
+
+	// Apply vars to all values from config
+	defaultValues = helper.ApplyVars(defaultValues, vars)
+	defaultEnvironment = helper.ApplyVars(defaultEnvironment, vars)
+	projects = helper.ApplyVars(projects, vars)
+	scripts = helper.ApplyVarsArray(scripts, vars)
+
+	flagList.Vars = vars
 
 	if flagList.ExecuteCommandInProjects != nil && *flagList.ExecuteCommandInProjects == true {
 		helper.ExecuteCommandInProjects(path, script, args, defaultValues, defaultEnvironment, flagList, projects)
@@ -129,6 +142,12 @@ func main() {
 
 	if flagList.ExecuteCommand != nil && *flagList.ExecuteCommand == true {
 		helper.ExecuteCommand(path, script, args, defaultValues, defaultEnvironment, flagList)
+		return
+	}
+
+	if flagList.ExecuteMultipleScripts != nil && *flagList.ExecuteMultipleScripts == true {
+		args = append([]string{script}, args...)
+		helper.ExecuteMultipleScripts(args, flagList)
 		return
 	}
 
@@ -152,13 +171,17 @@ func main() {
 	}
 
 	if flagList.AddToExecutableScript != nil && *flagList.AddToExecutableScript != "" {
-		args = append([]string{script}, args...)
+		if len(script) > 0 {
+			args = append([]string{script}, args...)
+		}
 		helper.AddToExecutableScript(args, flagList)
 		return
 	}
 
 	if flagList.RemoveExecutableScript != nil && *flagList.RemoveExecutableScript != "" {
-		args = append([]string{script}, args...)
+		if len(script) > 0 {
+			args = append([]string{script}, args...)
+		}
 		helper.RemoveExecutableScript(*flagList.RemoveExecutableScript, args)
 		return
 	}
@@ -168,18 +191,13 @@ func main() {
 		return
 	}
 
-	if originalWorkingDir != path {
-		flagList.UsedPath = path
-	}
+	flagList.OriginalPath = originalPath
+	flagList.UsedPath = path
 
 	if processErr != nil {
 		if packageJSON == nil {
 			packageJSON = &helper.PackageJSON{}
 		}
-		if helper.PassthruNpm(*packageJSON, script, args, defaultEnvironment, Version) == false {
-			log.Println(processErr)
-		}
-		return
 	}
 
 	if defaultValues != nil {
@@ -198,8 +216,41 @@ func main() {
 		return
 	}
 
+	if flagList.WebGetTemplate != nil && len(*flagList.WebGetTemplate) > 0 {
+		if len(script) > 0 {
+			args = append([]string{script}, args...)
+		}
+		helper.WebGetTemplate(args, flagList)
+		return
+	}
+
+	if flagList.WebGet != nil && *flagList.WebGet {
+		if len(script) > 0 {
+			args = append([]string{script}, args...)
+		}
+		helper.WebGet(args, flagList)
+		return
+	}
+
+	if flagList.ExecuteAlias != nil && *flagList.ExecuteAlias {
+		usr, _ := user.Current()
+		dir := usr.HomeDir
+		config, _ := helper.ReadConfig(dir + "/.nrun.json")
+		os.Chdir(flagList.UsedPath)
+		for _, alias := range flag.Args() {
+			command := config.Alias[alias]
+			if len(command) > 0 {
+				helper.ExecuteAlias(alias, command, flagList)
+			}
+		}
+		return
+	}
+
 	if processErr != nil {
-		log.Println(processErr)
+		if helper.PassthruNpm(*packageJSON, script, args, defaultEnvironment, Version) == false {
+			log.Println(processErr)
+		}
+		return
 	} else {
 		if len(script) == 0 || *flagList.ShowList == true {
 			helper.ShowScripts(*packageJSON, defaultValues, defaultEnvironment)

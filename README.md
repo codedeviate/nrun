@@ -1,6 +1,6 @@
 # nrun - The npm script runner
 
-**Current version is v0.18.1**
+**Current version is v0.19.0**
 
 nrun is a utility to make **npm run** a bit easier, and it has some nice features. It is written in Go which I find easier to use when creating portable executable code.
 
@@ -43,6 +43,7 @@ and the command that this script runs will be printed out.
 ## Usage:
 ```console
   nrun <scriptname> [args]          Run the script by name
+  nrun -a [alias]                   Execute aliases defined in the global .nrun.json file (separate multiple aliases with a space)
   nrun -l                           Shows all available scripts
   nrun                              Shows all available scripts (same as the -l flag)
   nrun -p <project>                 Run the script in the specified project path
@@ -57,6 +58,7 @@ and the command that this script runs will be printed out.
   nrun -ep <command>                Execute a command in all defined projects
   nrun -x  <script>                 Execute a defined nrun script in the current project
   nrun -xl                          List all defined nrun scripts and the commands they run
+  nrun -xm <script> [<script>...]   Execute multiple defined nrun scripts
   nrun -xp <script>                 Execute a defined nrun script in all defined projects
   nrun -xat <token>                 Add the X_AUTH_TOKEN environment variable to the script environment
   nrun -T                           Measure the time it takes to run a script
@@ -70,6 +72,28 @@ and the command that this script runs will be printed out.
 *Please note that the examples of the listed flags may require a combination with other flags and might not work stand-alone.*
 
 ## Flags
+
+### -a
+Execute aliases defined in the global .nrun.json file.
+
+Several aliases can be executed after each other by separating them with a space.
+
+```console
+foo@bar:~$ nrun -a master pull
+```
+This will execute the *master* alias and then the *pull* alias.
+If the *master* alias is defined as *git checkout master* and the *pull* alias is defined as *git pull* then the above command will be equivalent to the following command:
+```console
+foo@bar:~$ git checkout master && git pull
+```
+
+But aliases can also be combined with other flags. For example:
+```console
+foo@bar:~$ nrun -p project1 -a master pull
+```
+Which will execute the *master* alias in the *project1* project and then the *pull* alias in the *project1* project.
+
+Please note that this flag is a boolean flag and does not take any arguments. The aliases to be executed are given as arguments. So the aliases doesn't have to be directly after the -a flag.
 
 ### -l
 Shows all available scripts. This is the same as just typing nrun. It will show all scripts in the current project.
@@ -125,6 +149,15 @@ The commands don't have to be related to npm scripts.
 Scripts will be executed in separate shells and the output will be printed to the terminal.
 
 Flags and parameters can't be forwarded to the scripts.
+
+### -xm
+Execute multiple defined nrun scripts in parallel.
+
+This is useful if you want to execute multiple commands to be run in parallel. An example of this is if you want to run spin up both a NodeJS backend and a React frontend at the same time with one command.
+
+```console
+foo@bar:~$ nrun -xm start:backend start:frontend
+```
 
 ### -xp
 Execute a defined nrun script in all defined projects.
@@ -192,8 +225,8 @@ foo@bar:~$ go build -o nrun main.go
 ```
 
 ### Dependencies
-There is currently no dependencies for this tool (other than the need for [GoLang](https://go.dev/) to build it).
-* ~~[gopkg.in/ini.v1](https://pkg.go.dev/gopkg.in/ini.v1)~~
+There is currently one dependency for this tool (other than the need for [GoLang](https://go.dev/) to build it).
+* [github.com/google/shlex](https://github.com/google/shlex)
 
 ## .nrun.json
 Often used scriptnames can be mapped to other and shorter names in a file called .nrun.json.
@@ -231,11 +264,23 @@ The environment variables is not connected to the keys in the same directory but
   "projects": {
     "nruntest": "/Users/codedeviate/Development/nruntest"
   },
+  "alias": {
+    "pull": "git pull",
+    "merge": "git merge origin/master",
+    "checkout": "git checkout",
+    "master": "git checkout master"
+  },
   "scripts": {
     "test": [
       "echo \"Running tests\"",
       "echo \"Running tests\"",
       "echo \"Running tests\""
+    ],
+    "start:frontend":[
+      "nrun -x -p frontend start"
+    ],
+    "start:backend": [
+      "nrun -x -p backend start"
     ]
   },
   "xauthtokens":{
@@ -284,6 +329,8 @@ which is saving some keystrokes.
 
 ### Global mapping and environment
 Global section names are "\*" for mapping values and "\*" for environment values. These values will be overridden by values defined in the specific directory.
+
+If a value is already defined in the environment for the current shell then that value will be used instead of the value defined in the .nrun.json file.
 
 ```json
 {
