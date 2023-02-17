@@ -101,3 +101,25 @@ func RemoveProjectFromConfig(args []string) {
 		}
 	}
 }
+
+func GetProjectPath(args []string) {
+	usr, _ := user.Current()
+	dir := usr.HomeDir
+	config, err := ReadConfig(dir + "/.nrun.json")
+	if err != nil {
+		log.Println("Failed with", err)
+		return
+	} else {
+		for _, arg := range args {
+			if _, ok := config.Projects[arg]; ok {
+				if len(args) == 1 {
+					fmt.Println(config.Projects[arg])
+				} else {
+					fmt.Println(config.Projects[arg])
+				}
+			} else {
+				log.Println("Project", "\""+args[0]+"\"", "doesn't exists")
+			}
+		}
+	}
+}

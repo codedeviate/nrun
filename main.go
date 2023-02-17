@@ -34,6 +34,17 @@ func main() {
 	// Parse command line flags
 	args := flag.Args()
 
+	if flagList.PersonalFlags != nil && len(flagList.PersonalFlags) > 0 {
+		if helper.ExecutePersonalFlags(flagList) {
+			return
+		}
+	}
+
+	if flagList.GetProjectPath != nil && *flagList.GetProjectPath {
+		helper.GetProjectPath(args)
+		return
+	}
+
 	var script string
 	if len(args) > 0 {
 		script = args[0]

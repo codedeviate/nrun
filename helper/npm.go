@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/shlex"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"os/user"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -139,7 +141,11 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 
 			runErr := cmd.Run()
 
-			if runErr != nil {
+			var exErr *exec.ExitError
+			if errors.As(runErr, &exErr) {
+				Notify("Process failed with error-code " + strconv.Itoa(exErr.ExitCode()))
+				log.Println(runErr)
+			} else if runErr != nil {
 				log.Println(runErr)
 				return
 			}

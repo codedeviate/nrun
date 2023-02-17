@@ -122,6 +122,7 @@ func ParseFlags() *FlagList {
 	flagList.ShowCurrentProjectInfo = flag.Bool("i", false, "Show current project info")
 	flagList.AddProject = flag.Bool("pa", false, "Add a project to the config")
 	flagList.RemoveProject = flag.Bool("pr", false, "Remove a project from the config")
+	flagList.GetProjectPath = flag.Bool("path", false, "Get the path of a project from the config")
 	flagList.ListProjects = flag.Bool("pl", false, "List all projects from the config")
 	flagList.BeVerbose = flag.Bool("V", false, "Be verbose, shows all environment variables set by nrun")
 	flagList.PassthruNpm = flag.Bool("n", false, "Pass through to npm")
@@ -149,6 +150,17 @@ func ParseFlags() *FlagList {
 	// Inactive flags
 	flagList.TestAlarm = flag.Int64("t", 0, "Measure times in tests and notify when they are too long (time given in milliseconds)")
 
+	usr, _ := user.Current()
+	homeDir := usr.HomeDir
+	config, _ := ReadConfig(homeDir + "/.nrun.json")
+	if config != nil {
+		if config.PersonalFlags != nil {
+			flagList.PersonalFlags = make(map[string]*bool, len(config.PersonalFlags))
+			for k, _ := range config.PersonalFlags {
+				flagList.PersonalFlags[k] = flag.Bool(k, false, "Personal flag: "+k+". Usage is defined by the user in ~/.nrun.json")
+			}
+		}
+	}
 	flag.Parse()
 
 	/* Override WebGetHeader and WebGetNoBody if WebGetHeaderOnly is set */

@@ -25,7 +25,6 @@ func ExecuteScriptList(script string, scripts map[string][]string, args []string
 			if flagList.BeVerbose != nil && *flagList.BeVerbose == true {
 				fmt.Println("================================================================================")
 			}
-			fmt.Println("")
 		}
 	} else {
 		log.Println("No script found")

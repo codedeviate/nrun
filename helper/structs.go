@@ -22,6 +22,7 @@ type Config struct {
 	Scripts         map[string][]string             `json:"scripts"`
 	WebGetTemplates map[string]WebGetTemplateStruct `json:"webget"`
 	XAuthTokens     map[string]string               `json:"xauthtokens"`
+	PersonalFlags   map[string][]string             `json:"personalflags"`
 }
 
 type WebGetTemplateStruct struct {
@@ -50,6 +51,7 @@ type FlagList struct {
 	ShowCurrentProjectInfo   *bool
 	AddProject               *bool
 	RemoveProject            *bool
+	GetProjectPath           *bool
 	ListProjects             *bool
 	BeVerbose                *bool
 	PassthruNpm              *bool
@@ -76,6 +78,7 @@ type FlagList struct {
 	XAuthToken               *string
 	TestAlarm                *int64 // Time in milliseconds. Currently not used
 	Vars                     map[string]string
+	PersonalFlags            map[string]*bool
 }
 
 type Memory struct {

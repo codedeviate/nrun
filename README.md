@@ -271,6 +271,12 @@ The environment variables is not connected to the keys in the same directory but
     "master": "git checkout master"
   },
   "scripts": {
+    "status": [
+      "@@hasfile: .git",
+      "echo -n \"Branch in \" && echo -n $NRUN_CURRENT_PATH && echo -n \" is in branch \" && git rev-parse --abbrev-ref HEAD",
+      "git status --short",
+      "echo \"\""
+    ],
     "test": [
       "echo \"Running tests\"",
       "echo \"Running tests\"",
@@ -298,6 +304,13 @@ The environment variables is not connected to the keys in the same directory but
       },
       "XAuthToken": "14576cg9dg64752cv7cvb92"
     }
+  },
+  "personalflags": {
+    "morning": [
+      "say --voice Daniel \"Good morning! The status of your computer is as follows.\" &",
+      "nrun -pl",
+      "nrun -xp status"
+    ]
   }
 }
 ```
@@ -665,6 +678,46 @@ Such as
 * 0BSD
 * BSD-2-Clause
 * BSD-3-Clause
+
+## Personalized flags
+You can add your own flags to the tool by adding a section called personalflags in the global .nrun.json file.
+
+The section should be a JSON object where the key is the name of the flag and the value is an array of strings.
+```json
+{
+  "projects": {
+    "project1": "/Users/foobar/Development/project1",
+    "project2": "/Users/foobar/Development/project2",
+    "project3": "/Users/foobar/Development/project3",
+    "project4": "/Users/foobar/Development/project4",
+    "project5": "/Users/foobar/Development/project5",
+    "project6": "/Users/foobar/Development/project6",
+    "project7": "/Users/foobar/Development/project7",
+    "project8": "/Users/foobar/Development/project8",
+    "project9": "/Users/foobar/Development/project9"
+  },
+  "scripts": {
+    "status": [
+      "@@hasfile: .git",
+      "echo -n \"Branch in \" && echo -n $NRUN_CURRENT_PATH && echo -n \" is in branch \" && git rev-parse --abbrev-ref HEAD",
+      "git status --short",
+      "echo \"\""
+    ]
+  },
+  "personalflags": {
+    "morning": [
+      "say --voice Daniel \"Good morning! The status of your computer is as follows.\" &",
+      "nrun -pl",
+      "nrun -xp status"
+    ]
+  }
+}
+```
+The flag **morning** will now be available in the tool.
+```console
+foo@bar:~$ nrun -morning
+```
+And when run it will execute the commands in the array. The commands are executed in the order they are in the array. So the first the voice saying "Good morning" will be played and then the commands will be executed. In this particular example the say commands will be executed in the background (due to the ampersand at the end of the line) and then all projects will be listed followed by a status for all registered projects that run git.
 
 ## Fallback to npm
 If the script is not found in the package.json file then nrun will try a fallback to npm.
