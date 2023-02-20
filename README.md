@@ -42,32 +42,34 @@ and the command that this script runs will be printed out.
 
 ## Usage:
 ```console
-  nrun <scriptname> [args]          Run the script by name
-  nrun -a [alias]                   Execute aliases defined in the global .nrun.json file (separate multiple aliases with a space)
-  nrun -l                           Shows all available scripts
-  nrun                              Shows all available scripts (same as the -l flag)
-  nrun -p <project>                 Run the script in the specified project path
-  nrun -s <scriptname>              Show the script that will be executed without running it
-  nrun -h                           Shows help section
-  nrun -pl                          Shows all available projects
-  nrun -pa <project> <path>         Add a project to the list of projects
-  nrun -pr <project>                Remove a project from the list of projects
-  nrun -L ([license name]) (names)  Shows the licenses for the project
-  nrun -V                           Shows all environment variables set by nrun
-  nrun -e <command>                 Execute a command in the current project
-  nrun -ep <command>                Execute a command in all defined projects
-  nrun -x  <script>                 Execute a defined nrun script in the current project
-  nrun -xl                          List all defined nrun scripts and the commands they run
-  nrun -xm <script> [<script>...]   Execute multiple defined nrun scripts
-  nrun -xp <script>                 Execute a defined nrun script in all defined projects
-  nrun -xat <token>                 Add the X_AUTH_TOKEN environment variable to the script environment
-  nrun -T                           Measure the time it takes to run a script
-  nrun -w <url>                     Get the content of the url and print it to the terminal
-  nrun -wt <template>               Get the content of the url and its parameters defined in the template and print it to the terminal
-  nrun -wi                          Get the content of the url and print information about the response and the headers
-  nrun -wh                          Get the content of the url and print the headers
-  nrun -wnb                         Get the content of the url but don't print the body
-  nrun -who                         Get the content of the url but only print the headers
+  nrun <scriptname> [args]               Run the script by name
+  nrun -a [alias]                        Execute aliases defined in the global .nrun.json file (separate multiple aliases with a space)
+  nrun -l                                Shows all available scripts
+  nrun                                   Shows all available scripts (same as the -l flag)
+  nrun -p <project>                      Run the script in the specified project path
+  nrun -s <scriptname>                   Show the script that will be executed without running it
+  nrun -h                                Shows help section
+  nrun -pl                               Shows all available projects
+  nrun -pa <project> <path>              Add a project to the list of projects
+  nrun -pr <project>                     Remove a project from the list of projects
+  nrun -L ([license name]) (names)       Shows the licenses for the project
+  nrun -V                                Shows all environment variables set by nrun
+  nrun -e <command>                      Execute a command in the current project
+  nrun -ep <command>                     Execute a command in all defined projects
+  nrun -x  <script>                      Execute a defined nrun script in the current project
+  nrun -xl                               List all defined nrun scripts and the commands they run
+  nrun -xm <script> [<script>...]        Execute multiple defined nrun scripts
+  nrun -xp <script>                      Execute a defined nrun script in all defined projects
+  nrun -xat <token>                      Add the X_AUTH_TOKEN environment variable to the script environment
+  nrun -T                                Measure the time it takes to run a script
+  nrun -w <url>                          Get the content of the url and print it to the terminal
+  nrun -wt <template>                    Get the content of the url and its parameters defined in the template and print it to the terminal
+  nrun -wi                               Get the content of the url and print information about the response and the headers
+  nrun -wh                               Get the content of the url and print the headers
+  nrun -wnb                              Get the content of the url but don't print the body
+  nrun -who                              Get the content of the url but only print the headers
+  nrun -jwt <token>                      Read a token and parse it as a JWT token and print the header and payload
+  nrun -jwt-sign <secret> < <json data>  Read payload from STDIN and sign it with the secret and print the token 
 ```
 *Please note that the examples of the listed flags may require a combination with other flags and might not work stand-alone.*
 
@@ -189,6 +191,43 @@ The time will be printed to the terminal when the script has finished.
 | 20ms - 0.02 seconds     | Xus    | 1220us  |
 | 0 -> 20ms               | Xns    | 16922ns |
 
+
+### -jwt &lt;token&gt;
+Reads the token and parses it.
+
+The function prints out the header and payload of the token as prettified JSON.
+
+```console
+foo@bar:~$ nrun -jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiTmlzc2UgSHVsdCIsInVzZXJuYW1lIjoibmlzc2UiLCJlbWFpbCI6Im5pc3NlQGV4YW1wbGUuY29tIn0.VA16nPv9fdcVArzz2xEHAsyHVbPwSIVqE7f9iSJ119A
+Header: {
+    "alg": "HS256",
+    "typ": "JWT"
+}
+Payload: {
+    "email": "nisse@example.com",
+    "name": "Nisse Hult",
+    "username": "nisse"
+}
+```
+### -jwt-sign &lt;secret&gt; &lt; &lt;payload&gt;
+Read the payload from STDIN and sign it with the given secret.
+
+This also add the header to the token.
+
+The token is signed with the HS256 algorithm.
+```console
+foo@bar:~$ cat payload.json
+{
+    "email": "nisse@example.com",
+    "name": "Nisse Hult",
+    "username": "nisse"
+}
+foo@bar:~$ nrun -jwt-sign mysecret < payload.json
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgICAiZW1haWwiOiAibmlzc2VAZXhhbXBsZS5jb20iLCAibmFtZSI6ICJOaXNzZSBIdWx0IiwgInVzZXJuYW1lIjogIm5pc3NlIn0.7cIQmQs9Sgf2z0kmU2460BFlfsyQqGpwsegs00_w3b8
+```
+
+1. **Note:** The payload must be valid JSON.
+2. **Note:** The difference in the examples depends on the formatting of the payload (different number of whitespace characters).
 
 ## Pre- and post-scripts
 It is possible to define scripts that will be run before and after the main script.

@@ -34,6 +34,16 @@ func main() {
 	// Parse command line flags
 	args := flag.Args()
 
+	if flagList.UnpackJWTToken != nil && *flagList.UnpackJWTToken != "" {
+		helper.UnpackJWTToken(*flagList.UnpackJWTToken)
+		return
+	}
+
+	if flagList.SignJWTToken != nil && *flagList.SignJWTToken == true {
+		helper.SignJWTToken(args)
+		return
+	}
+
 	if flagList.PersonalFlags != nil && len(flagList.PersonalFlags) > 0 {
 		if helper.ExecutePersonalFlags(flagList) {
 			return

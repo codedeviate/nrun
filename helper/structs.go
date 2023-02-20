@@ -79,6 +79,8 @@ type FlagList struct {
 	TestAlarm                *int64 // Time in milliseconds. Currently not used
 	Vars                     map[string]string
 	PersonalFlags            map[string]*bool
+	UnpackJWTToken           *string
+	SignJWTToken             *bool
 }
 
 type Memory struct {
