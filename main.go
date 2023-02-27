@@ -34,8 +34,14 @@ func main() {
 	// Parse command line flags
 	args := flag.Args()
 
-	if flagList.UnpackJWTToken != nil && *flagList.UnpackJWTToken != "" {
-		helper.UnpackJWTToken(*flagList.UnpackJWTToken)
+	if flagList.UnpackJWTToken != nil && *flagList.UnpackJWTToken != false {
+		if len(args) == 0 {
+			helper.UnpackJWTToken("")
+			return
+		}
+		for _, arg := range args {
+			helper.UnpackJWTToken(arg)
+		}
 		return
 	}
 

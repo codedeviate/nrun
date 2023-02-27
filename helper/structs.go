@@ -81,7 +81,7 @@ type FlagList struct {
 	TestAlarm                *int64 // Time in milliseconds. Currently not used
 	Vars                     map[string]string
 	PersonalFlags            map[string]*bool
-	UnpackJWTToken           *string
+	UnpackJWTToken           *bool
 	SignJWTToken             *bool
 	ValidateJWTToken         *string
 }
@@ -90,4 +90,23 @@ type Memory struct {
 	MemTotal     int
 	MemFree      int
 	MemAvailable int
+}
+
+type JWTToken struct {
+	Header    JWTTokenHeader
+	Payload   JWTTokenPayload
+	Signature string
+}
+type JWTTokenHeader struct {
+	Alg string `json:"alg"`
+	Typ string `json:"typ"`
+}
+type JWTTokenPayload struct {
+	Exp int64  `json:"exp"`
+	Iat int64  `json:"iat"`
+	Iss string `json:"iss"`
+	Sub string `json:"sub"`
+	Aud string `json:"aud"`
+	Nbf int64  `json:"nbf"`
+	Jti string `json:"jti"`
 }

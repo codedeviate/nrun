@@ -210,7 +210,7 @@ func ParseFlags() *FlagList {
 	flagList.WebGetFormat = flag.String("wf", "", "Set the format for the web request")
 	flagList.WebGetAll = flag.Bool("wa", false, "Get information, headers and body for the web response")
 	flagList.XAuthToken = flag.String("xat", "", "Set the X-AUTH-TOKEN to use")
-	flagList.UnpackJWTToken = flag.String("jwt", "", "Unpack a JWT token")
+	flagList.UnpackJWTToken = flag.Bool("jwt", false, "Unpack a JWT token")
 	flagList.SignJWTToken = flag.Bool("jwt-sign", false, "Sign a JWT token")
 	flagList.ValidateJWTToken = flag.String("jwt-validate", "", "Validate a JWT token")
 	// Inactive flags
