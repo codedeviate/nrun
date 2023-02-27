@@ -70,6 +70,7 @@ and the command that this script runs will be printed out.
   nrun -who                              Get the content of the url but only print the headers
   nrun -jwt <token>                      Read a token and parse it as a JWT token and print the header and payload
   nrun -jwt-sign <secret> < <json data>  Read payload from STDIN and sign it with the secret and print the token 
+  nrun -jwt-verify <token> <secret>      Verify the token with the secret and print it the token is valid or not
 ```
 *Please note that the examples of the listed flags may require a combination with other flags and might not work stand-alone.*
 
@@ -192,7 +193,7 @@ The time will be printed to the terminal when the script has finished.
 | 0 -> 20ms               | Xns    | 16922ns |
 
 
-### -jwt &lt;token&gt;
+### -jwt
 Reads the token and parses it.
 
 The function prints out the header and payload of the token as prettified JSON.
@@ -209,7 +210,7 @@ Payload: {
     "username": "nisse"
 }
 ```
-### -jwt-sign &lt;secret&gt; &lt; &lt;payload&gt;
+### -jwt-sign
 Read the payload from STDIN and sign it with the given secret.
 
 This also add the header to the token.
@@ -229,6 +230,15 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgICAiZW1haWwiOiAibmlzc2VAZXhhbXBsZS5jb20
 1. **Note:** The payload must be valid JSON.
 2. **Note:** The difference in the examples depends on the formatting of the payload (different number of whitespace characters).
 
+### -jwt-verify
+Verify the token and print the result.
+
+Note that the token is a parameter to the -jwt-verify flag and not a parameter to the script. The secret is the first (and only) argument to the script.
+
+```console
+foo@bar:~$ nrun -jwt-validate eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiTmlzc2UgSHVsdCIsInVzZXJuYW1lIjoibmlzc2UiLCJlbWFpbCI6Im5pc3NlQGV4YW1wbGUuY29tIn0.VA16nPv9fdcVArzz2xEHAsyHVbPwSIVqE7f9iSJ119A mysecret
+Valid JWT token
+```
 ## Pre- and post-scripts
 It is possible to define scripts that will be run before and after the main script.
 This is useful if you want to do some setup before running the main script and some cleanup after the main script has finished.
@@ -350,6 +360,18 @@ The environment variables is not connected to the keys in the same directory but
       "nrun -pl",
       "nrun -xp status"
     ]
+  },
+  "package.json": {
+    "/Users/codedeviate/Development/nruntest": {
+      "scripts": {
+        "start:localhost": "PORT=3007 npm run start:localhost"
+      }
+    },
+    "@nruntest": {
+      "scripts": {
+        "start:localhost": "PORT=3007 npm run start:localhost"
+      }
+    }
   }
 }
 ```
@@ -437,6 +459,26 @@ foo@bar:~$ nrun test
 ```console
 foo@bar:~$ nrun -p /Users/codedeviate/Development/nruntest test
 ```
+## Overriding package.json scripts
+You can override scripts in your package.json file by using the "package.json" section in the .nrun.json file.
+
+```json
+{
+  "package.json": {
+    "/Users/codedeviate/Development/nruntest": {
+      "scripts": {
+        "start:localhost": "PORT=3007 npm run start:localhost"
+      }
+    }
+  }
+}
+```
+
+With this you can use nrun to run scripts as if they were in your package.json file. This is useful if you want to use nrun to run scripts in a project that you don't have access to the source code for or when you need a special script that you don't want to add to the package.json file (or if the product manager wants to reduce the number of scripts that you usually need for development).
+
+The key in the "package.json" section is the path to the project. The project name can be used as well if it is prefixed with an @ sign.
+
+Please be aware that the scripts in the "package.json" section will override the scripts in the package.json file. This means that if you have a script in the "package.json" section with the same name as a script in the package.json file then the script in the "package.json" section will be used. This might lead to some confusion if you are not aware of this.
 
 
 ## Different ways to use nrun

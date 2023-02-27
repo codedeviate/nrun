@@ -43,6 +43,10 @@ func main() {
 		helper.SignJWTToken(args)
 		return
 	}
+	if flagList.ValidateJWTToken != nil && *flagList.ValidateJWTToken != "" {
+		helper.ValidateJWTToken(flagList, args)
+		return
+	}
 
 	if flagList.PersonalFlags != nil && len(flagList.PersonalFlags) > 0 {
 		if helper.ExecutePersonalFlags(flagList) {
@@ -134,7 +138,7 @@ func main() {
 	}
 
 	if *flagList.UseAnotherPath != "" {
-		_, _, projects, _, _ := helper.GetDefaultValues("")
+		_, _, projects, _, _, _ := helper.GetDefaultValues("")
 		path = *flagList.UseAnotherPath
 		if _, ok := projects[path]; ok {
 			path = projects[path]
@@ -146,7 +150,11 @@ func main() {
 		os.Chdir(path)
 	}
 	packageJSON, path, processErr := helper.ProcessPath(path)
-	defaultValues, defaultEnvironment, projects, scripts, vars := helper.GetDefaultValues(path)
+	defaultValues, defaultEnvironment, projects, scripts, vars, packageJSONOverrides := helper.GetDefaultValues(path)
+
+	if packageJSONOverrides != nil {
+		helper.ApplyPackageJSONOverrides(packageJSON, packageJSONOverrides)
+	}
 
 	// Apply vars to all values from config
 	defaultValues = helper.ApplyVars(defaultValues, vars)

@@ -14,15 +14,17 @@ type PackageJSON struct {
 }
 
 type Config struct {
-	Env             map[string]map[string]string    `json:"env"`
-	Path            map[string]map[string]string    `json:"path"`
-	Vars            map[string]string               `json:"vars"`
-	Projects        map[string]string               `json:"projects"`
-	Alias           map[string]string               `json:"alias"`
-	Scripts         map[string][]string             `json:"scripts"`
-	WebGetTemplates map[string]WebGetTemplateStruct `json:"webget"`
-	XAuthTokens     map[string]string               `json:"xauthtokens"`
-	PersonalFlags   map[string][]string             `json:"personalflags"`
+	Env                 map[string]map[string]string    `json:"env"`
+	Path                map[string]map[string]string    `json:"path"`
+	Vars                map[string]string               `json:"vars"`
+	Projects            map[string]string               `json:"projects"`
+	Alias               map[string]string               `json:"alias"`
+	Scripts             map[string][]string             `json:"scripts"`
+	WebGetTemplates     map[string]WebGetTemplateStruct `json:"webget"`
+	XAuthTokens         map[string]string               `json:"xauthtokens"`
+	PersonalFlags       map[string][]string             `json:"personalflags"`
+	TokenTemplates      map[string]string               `json:"tokentemplates"`
+	PackageJSONOverride map[string]interface{}          `json:"package.json"`
 }
 
 type WebGetTemplateStruct struct {
@@ -81,6 +83,7 @@ type FlagList struct {
 	PersonalFlags            map[string]*bool
 	UnpackJWTToken           *string
 	SignJWTToken             *bool
+	ValidateJWTToken         *string
 }
 
 type Memory struct {
