@@ -101,6 +101,11 @@ func main() {
 		}
 	}()
 
+	if flagList.TellAJoke != nil && *flagList.TellAJoke {
+		helper.TellAJoke()
+		return
+	}
+
 	if *flagList.SystemInfo {
 		helper.SystemInfo(Version)
 		return
@@ -156,10 +161,15 @@ func main() {
 		os.Chdir(path)
 	}
 	packageJSON, path, processErr := helper.ProcessPath(path)
-	defaultValues, defaultEnvironment, projects, scripts, vars, packageJSONOverrides := helper.GetDefaultValues(path)
+	if processErr != nil {
+		if packageJSON == nil {
+			packageJSON = &helper.PackageJSON{}
+		}
+	}
 
+	defaultValues, defaultEnvironment, projects, scripts, vars, packageJSONOverrides := helper.GetDefaultValues(path)
 	if packageJSONOverrides != nil {
-		helper.ApplyPackageJSONOverrides(packageJSON, packageJSONOverrides)
+		packageJSON = helper.ApplyPackageJSONOverrides(packageJSON, packageJSONOverrides)
 	}
 
 	// Apply vars to all values from config
@@ -229,12 +239,6 @@ func main() {
 	flagList.OriginalPath = originalPath
 	flagList.UsedPath = path
 
-	if processErr != nil {
-		if packageJSON == nil {
-			packageJSON = &helper.PackageJSON{}
-		}
-	}
-
 	if defaultValues != nil {
 		if len(defaultValues[script]) > 0 {
 			script = defaultValues[script]
@@ -281,19 +285,19 @@ func main() {
 		return
 	}
 
-	if processErr != nil {
-		if helper.PassthruNpm(*packageJSON, script, args, defaultEnvironment, Version) == false {
-			log.Println(processErr)
-		}
-		return
+	//if processErr != nil {
+	//	if helper.PassthruNpm(*packageJSON, script, args, defaultEnvironment, Version) == false {
+	//		log.Println(processErr)
+	//	}
+	//	return
+	//} else {
+	if len(script) == 0 || *flagList.ShowList == true {
+		helper.ShowScripts(*packageJSON, defaultValues, defaultEnvironment)
+	} else if *flagList.ShowScript == true {
+		helper.ShowScript(*packageJSON, script)
 	} else {
-		if len(script) == 0 || *flagList.ShowList == true {
-			helper.ShowScripts(*packageJSON, defaultValues, defaultEnvironment)
-		} else if *flagList.ShowScript == true {
-			helper.ShowScript(*packageJSON, script)
-		} else {
-			helper.RunNPM(*packageJSON, path, script, args, defaultEnvironment, flagList, Version)
-		}
+		helper.RunNPM(*packageJSON, path, script, args, defaultEnvironment, flagList, Version)
 	}
+	//}
 
 }

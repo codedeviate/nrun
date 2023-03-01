@@ -84,6 +84,7 @@ type FlagList struct {
 	UnpackJWTToken           *bool
 	SignJWTToken             *bool
 	ValidateJWTToken         *string
+	TellAJoke                *bool
 }
 
 type Memory struct {

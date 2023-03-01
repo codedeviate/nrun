@@ -79,24 +79,43 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 			scripts[k] = v
 		}
 		if config.PackageJSONOverride != nil {
+			if packageJson["scripts"] == nil {
+				packageJson["scripts"] = make(map[string]interface{}, 1000)
+			}
+			if config.PackageJSONOverride["*"] != nil {
+				for k, v := range config.PackageJSONOverride["*"].(map[string]interface{}) {
+					vType := reflect.TypeOf(v)
+					if vType.Kind() == reflect.Map {
+						for k2, v2 := range v.(map[string]interface{}) {
+							if k == "scripts" {
+								packageJson["scripts"].(map[string]interface{})[k2] = v2
+							}
+						}
+					}
+				}
+			}
 			for k, v := range config.PackageJSONOverride {
 				if path == k {
 					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.String {
-						packageJson[k] = v
-					} else if vType.Kind() == reflect.Map {
+					if vType.Kind() == reflect.Map {
 						for k2, v2 := range v.(map[string]interface{}) {
-							packageJson[k2] = v2
+							for k3, v3 := range v2.(map[string]interface{}) {
+								if k2 == "scripts" {
+									packageJson["scripts"].(map[string]interface{})[k3] = v3
+								}
+							}
 						}
 					}
 				}
 				if len(k) > 1 && k[0] == '@' && len(config.Projects[k[1:]]) > 0 && config.Projects[k[1:]] == path {
 					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.String {
-						packageJson[k] = v
-					} else if vType.Kind() == reflect.Map {
+					if vType.Kind() == reflect.Map {
 						for k2, v2 := range v.(map[string]interface{}) {
-							packageJson[k2] = v2
+							for k3, v3 := range v2.(map[string]interface{}) {
+								if k2 == "scripts" {
+									packageJson["scripts"].(map[string]interface{})[k3] = v3
+								}
+							}
 						}
 					}
 				}
@@ -129,24 +148,31 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 			vars[k] = v
 		}
 		if config.PackageJSONOverride != nil {
+			if packageJson["scripts"] == nil {
+				packageJson["scripts"] = make(map[string]interface{}, 1000)
+			}
 			for k, v := range config.PackageJSONOverride {
 				if path == k {
 					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.String {
-						packageJson[k] = v
-					} else if vType.Kind() == reflect.Map {
+					if vType.Kind() == reflect.Map {
 						for k2, v2 := range v.(map[string]interface{}) {
-							packageJson[k2] = v2
+							for k3, v3 := range v2.(map[string]interface{}) {
+								if k2 == "scripts" {
+									packageJson["scripts"].(map[string]interface{})[k3] = v3
+								}
+							}
 						}
 					}
 				}
 				if len(k) > 1 && k[0] == '@' && len(config.Projects[k[1:]]) > 0 && config.Projects[k[1:]] == path {
 					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.String {
-						packageJson[k] = v
-					} else if vType.Kind() == reflect.Map {
+					if vType.Kind() == reflect.Map {
 						for k2, v2 := range v.(map[string]interface{}) {
-							packageJson[k2] = v2
+							for k3, v3 := range v2.(map[string]interface{}) {
+								if k2 == "scripts" {
+									packageJson["scripts"].(map[string]interface{})[k3] = v3
+								}
+							}
 						}
 					}
 				}
@@ -157,17 +183,21 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 	return defaults, defaultEnvs, projects, scripts, vars, packageJson
 }
 
-func ApplyPackageJSONOverrides(packageJSON *PackageJSON, packageJSONOverrides map[string]interface{}) {
+func ApplyPackageJSONOverrides(packageJSON *PackageJSON, packageJSONOverrides map[string]interface{}) *PackageJSON {
 	for k, v := range packageJSONOverrides {
 		vType := reflect.TypeOf(v)
 		if vType.Kind() == reflect.Map {
 			if k == "scripts" {
+				if packageJSON.Scripts == nil {
+					packageJSON.Scripts = make(map[string]string, 1000)
+				}
 				for k2, v2 := range v.(map[string]interface{}) {
 					packageJSON.Scripts[k2] = v2.(string)
 				}
 			}
 		}
 	}
+	return packageJSON
 }
 
 func ParseFlags() *FlagList {
@@ -213,6 +243,7 @@ func ParseFlags() *FlagList {
 	flagList.UnpackJWTToken = flag.Bool("jwt", false, "Unpack a JWT token")
 	flagList.SignJWTToken = flag.Bool("jwt-sign", false, "Sign a JWT token")
 	flagList.ValidateJWTToken = flag.String("jwt-validate", "", "Validate a JWT token")
+	flagList.TellAJoke = flag.Bool("joke", false, "Tell a joke")
 	// Inactive flags
 	flagList.TestAlarm = flag.Int64("t", 0, "Measure times in tests and notify when they are too long (time given in milliseconds)")
 
