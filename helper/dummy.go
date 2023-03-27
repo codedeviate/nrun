@@ -12,6 +12,8 @@ type Joke struct {
 	Category string `json:"category"`
 	Type     string `json:"type"`
 	Joke     string `json:"joke"`
+	Setup    string `json:"setup"`
+	Delivery string `json:"delivery"`
 	Flags    struct {
 		Nsfw      bool `json:"nsfw"`
 		Religious bool `json:"religious"`
@@ -28,10 +30,15 @@ type Joke struct {
 func TellAJoke() {
 	// Call https://v2.jokeapi.dev/joke/Any?type=single to get a random joke
 	// and print it to the console
-	cmd := exec.Command("curl", "-s", "https://v2.jokeapi.dev/joke/Any?type=single")
+	cmd := exec.Command("curl", "-s", "https://v2.jokeapi.dev/joke/Any")
 	stdout, _ := cmd.Output()
 	var joke Joke
 	_ = json.Unmarshal(stdout, &joke)
+	if joke.Type == "twopart" {
+		joke.Joke = joke.Setup + "\n\n" + joke.Delivery
+	} else if joke.Type == "single" {
+		joke.Joke = joke.Joke
+	}
 	fmt.Println(joke.Joke)
 	Notify(joke.Joke)
 }
@@ -70,4 +77,26 @@ func DummyCode() {
 	cmd = exec.Command("which", "ash")
 	stdout, _ = cmd.Output()
 	fmt.Println("Almquist Shell (ash)              :", strings.Trim(string(stdout), " \n"))
+
+}
+
+func VersionInformation() {
+	fmt.Println("Version information:")
+
+	fmt.Println("NVM (Node Version Manager")
+	version, err := GetLatestNVMRelease()
+	if err != nil {
+		fmt.Println("  Error getting latest NVM release:", err)
+	} else {
+		fmt.Println("  Latest NVM release:", version)
+	}
+
+	fmt.Println("Node.js")
+	versions, err2 := GetLatestNodeJSRelease()
+	if err2 != nil {
+		fmt.Println("  Error getting latest Node.js release:", err2)
+	} else {
+		nodeVersion := versions[0]
+		fmt.Println("  Latest Node.js release:", nodeVersion.Version)
+	}
 }

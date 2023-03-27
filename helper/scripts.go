@@ -127,7 +127,19 @@ func ExecuteScripts(path string, scriptName string, scripts []string, args []str
 							} else if commandName == "cd" {
 								commandArgs = strings.TrimSpace(commandArgs)
 								if len(commandArgs) > 0 {
-									if commandArgs[0] != '/' {
+									if commandArgs[0] == '@' {
+										// chdir into project
+										projectName := commandArgs[1:]
+										if len(projectName) > 0 {
+											usr, _ := user.Current()
+											dir := usr.HomeDir
+											config, _ := ReadConfig(dir + "/.nrun.json")
+											if projectPath, ok := config.Projects[projectName]; ok {
+												os.Chdir(projectPath)
+												path, _ = os.Getwd()
+											}
+										}
+									} else if commandArgs[0] != '/' {
 										os.Chdir(path + "/" + commandArgs)
 										path, _ = os.Getwd()
 									} else {

@@ -14,22 +14,21 @@ import (
 const Version = "0.20.0"
 
 func main() {
+	go helper.NotificationRunner()
+	process()
+
+	for {
+		time.Sleep(100 * time.Millisecond)
+		if helper.WaitingNotifications == 0 {
+			break
+		}
+	}
+}
+
+func process() {
 	originalPath, _ := os.Getwd()
 	flagList := helper.ParseFlags()
 	timeStarted := time.Now()
-
-	//// Process any aliases first
-	//config, _ := helper.ReadConfig(dir + "/.nrun.json")
-	//aliasExecuted := false
-	//for _, key := range os.Args[1:] {
-	//	if config.Alias[key] != "" {
-	//		helper.ExecuteAlias(config.Alias[key])
-	//		aliasExecuted = true
-	//	}
-	//}
-	//if aliasExecuted {
-	//	return
-	//}
 
 	// Parse command line flags
 	args := flag.Args()
@@ -101,6 +100,10 @@ func main() {
 		}
 	}()
 
+	if flagList.Sleep != nil && *flagList.Sleep > 0 {
+		time.Sleep(time.Duration(*flagList.Sleep) * time.Millisecond)
+	}
+
 	if flagList.TellAJoke != nil && *flagList.TellAJoke {
 		helper.TellAJoke()
 		return
@@ -141,6 +144,10 @@ func main() {
 		return
 	}
 
+	if *flagList.VersionInformatrion == true {
+		helper.VersionInformation()
+		return
+	}
 	if *flagList.UseAnotherPath == "" {
 		env := os.Getenv("NRUNPROJECT")
 		if env != "" {
@@ -149,7 +156,7 @@ func main() {
 	}
 
 	if *flagList.UseAnotherPath != "" {
-		_, _, projects, _, _, _ := helper.GetDefaultValues("")
+		_, _, projects, _, _, _, _ := helper.GetDefaultValues("")
 		path = *flagList.UseAnotherPath
 		if _, ok := projects[path]; ok {
 			path = projects[path]
@@ -167,7 +174,30 @@ func main() {
 		}
 	}
 
-	defaultValues, defaultEnvironment, projects, scripts, vars, packageJSONOverrides := helper.GetDefaultValues(path)
+	defaultValues, defaultEnvironment, projects, scripts, vars, packageJSONOverrides, pipes := helper.GetDefaultValues(path)
+
+	// Check if we should skip overriding stuff
+	if flagList.NoOverride != nil && *flagList.NoOverride == true {
+		packageJSONOverrides = nil
+		defaultValues = make(map[string]string)
+		defaultEnvironment = make(map[string]string)
+		scripts = make(map[string][]string)
+	}
+
+	// Check if we should skip overriding the package.json
+	if flagList.NoPackageJSONOverride != nil && *flagList.NoPackageJSONOverride == true {
+		packageJSONOverrides = nil
+	}
+
+	// Check if we should skip default values
+	// The difference between NoDefaultValues and NoDefaultValues2 is that NoDefaultValues2 removes the default values
+	// from the config and NoDefaultValues only removes the default values from the current run
+	if flagList.NoDefaultValues2 != nil && *flagList.NoDefaultValues2 == true {
+		defaultValues = make(map[string]string)
+		defaultEnvironment = make(map[string]string)
+	}
+
+	// Check if we should override the package.json
 	if packageJSONOverrides != nil {
 		packageJSON = helper.ApplyPackageJSONOverrides(packageJSON, packageJSONOverrides)
 	}
@@ -177,16 +207,17 @@ func main() {
 	defaultEnvironment = helper.ApplyVars(defaultEnvironment, vars)
 	projects = helper.ApplyVars(projects, vars)
 	scripts = helper.ApplyVarsArray(scripts, vars)
+	pipes = helper.ApplyVarsArray(pipes, vars)
 
 	flagList.Vars = vars
 
 	if flagList.ExecuteCommandInProjects != nil && *flagList.ExecuteCommandInProjects == true {
-		helper.ExecuteCommandInProjects(path, script, args, defaultValues, defaultEnvironment, flagList, projects)
+		helper.ExecuteCommandInProjects(path, script, args, defaultValues, defaultEnvironment, flagList, projects, pipes)
 		return
 	}
 
 	if flagList.ExecuteCommand != nil && *flagList.ExecuteCommand == true {
-		helper.ExecuteCommand(path, script, args, defaultValues, defaultEnvironment, flagList)
+		helper.ExecuteCommand(path, script, args, defaultValues, defaultEnvironment, flagList, pipes)
 		return
 	}
 
@@ -296,7 +327,7 @@ func main() {
 	} else if *flagList.ShowScript == true {
 		helper.ShowScript(*packageJSON, script)
 	} else {
-		helper.RunNPM(*packageJSON, path, script, args, defaultEnvironment, flagList, Version)
+		helper.RunNPM(*packageJSON, path, script, args, defaultEnvironment, flagList, Version, pipes)
 	}
 	//}
 

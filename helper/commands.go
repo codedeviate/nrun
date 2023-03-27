@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func ExecuteCommandInProjects(path string, script string, args []string, defaultValues map[string]string, defaultEnvironment map[string]string, flagList *FlagList, projects map[string]string) {
+func ExecuteCommandInProjects(path string, script string, args []string, defaultValues map[string]string, defaultEnvironment map[string]string, flagList *FlagList, projects map[string]string, pipes map[string][]string) {
 	if len(script) == 0 {
 		log.Println("No command given 2")
 		//			return
@@ -28,7 +28,7 @@ func ExecuteCommandInProjects(path string, script string, args []string, default
 			fmt.Println("  in project", projectName, "at", projectPath)
 			fmt.Println("================================================================================")
 		}
-		ExecuteCommand(projectPath, script, args, defaultValues, defaultEnvironment, flagList)
+		ExecuteCommand(projectPath, script, args, defaultValues, defaultEnvironment, flagList, pipes)
 		if flagList.BeVerbose != nil && *flagList.BeVerbose == true {
 			fmt.Println("================================================================================")
 		}
@@ -36,7 +36,7 @@ func ExecuteCommandInProjects(path string, script string, args []string, default
 	}
 }
 
-func ExecuteCommand(path string, script string, args []string, defaultValues map[string]string, defaultEnvironment map[string]string, flagList *FlagList) {
+func ExecuteCommand(path string, script string, args []string, defaultValues map[string]string, defaultEnvironment map[string]string, flagList *FlagList, pipes map[string][]string) {
 	if len(script) == 0 {
 		log.Println("No command given.")
 		//		return

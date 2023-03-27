@@ -13,6 +13,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
@@ -41,13 +44,14 @@ func ProcessPath(path string, maxDepths ...int) (*PackageJSON, string, error) {
 	return &packageJSON, path, nil
 }
 
-func GetDefaultValues(path string) (map[string]string, map[string]string, map[string]string, map[string][]string, map[string]string, map[string]interface{}) {
+func GetDefaultValues(path string) (map[string]string, map[string]string, map[string]string, map[string][]string, map[string]string, map[string]interface{}, map[string][]string) {
 	defaults := make(map[string]string, 1000)
 	defaultEnvs := make(map[string]string, 1000)
 	projects := make(map[string]string, 1000)
 	scripts := make(map[string][]string, 1000)
 	vars := make(map[string]string, 1000)
 	packageJson := make(map[string]interface{}, 1000)
+	pipes := make(map[string][]string, 1000)
 
 	usr, _ := user.Current()
 	dir := usr.HomeDir
@@ -78,6 +82,25 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 		for k, v := range config.Scripts {
 			scripts[k] = v
 		}
+		for k, v := range config.Pipes {
+			klist := strings.Split(k, ",")
+			for _, k2 := range klist {
+				k2 = strings.TrimSpace(k)
+				if k2[0] == '@' && len(config.Projects[k2[1:]]) > 0 && config.Projects[k2[1:]] == path {
+					for k3, v2 := range v {
+						pipes[k3] = v2
+					}
+				} else if k2 == "*" {
+					for k3, v2 := range v {
+						pipes[k3] = v2
+					}
+				} else if k2 == path {
+					for k3, v2 := range v {
+						pipes[k3] = v2
+					}
+				}
+			}
+		}
 		if config.PackageJSONOverride != nil {
 			if packageJson["scripts"] == nil {
 				packageJson["scripts"] = make(map[string]interface{}, 1000)
@@ -94,26 +117,30 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 					}
 				}
 			}
-			for k, v := range config.PackageJSONOverride {
-				if path == k {
-					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.Map {
-						for k2, v2 := range v.(map[string]interface{}) {
-							for k3, v3 := range v2.(map[string]interface{}) {
-								if k2 == "scripts" {
-									packageJson["scripts"].(map[string]interface{})[k3] = v3
+			for kList, v := range config.PackageJSONOverride {
+				kList := strings.Split(kList, ",")
+				for _, k := range kList {
+					k = strings.TrimSpace(k)
+					if path == k {
+						vType := reflect.TypeOf(v)
+						if vType.Kind() == reflect.Map {
+							for k2, v2 := range v.(map[string]interface{}) {
+								for k3, v3 := range v2.(map[string]interface{}) {
+									if k2 == "scripts" {
+										packageJson["scripts"].(map[string]interface{})[k3] = v3
+									}
 								}
 							}
 						}
 					}
-				}
-				if len(k) > 1 && k[0] == '@' && len(config.Projects[k[1:]]) > 0 && config.Projects[k[1:]] == path {
-					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.Map {
-						for k2, v2 := range v.(map[string]interface{}) {
-							for k3, v3 := range v2.(map[string]interface{}) {
-								if k2 == "scripts" {
-									packageJson["scripts"].(map[string]interface{})[k3] = v3
+					if len(k) > 1 && k[0] == '@' && len(config.Projects[k[1:]]) > 0 && config.Projects[k[1:]] == path {
+						vType := reflect.TypeOf(v)
+						if vType.Kind() == reflect.Map {
+							for k2, v2 := range v.(map[string]interface{}) {
+								for k3, v3 := range v2.(map[string]interface{}) {
+									if k2 == "scripts" {
+										packageJson["scripts"].(map[string]interface{})[k3] = v3
+									}
 								}
 							}
 						}
@@ -124,7 +151,7 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 	}
 
 	if path == "" {
-		return defaults, defaultEnvs, projects, scripts, vars, packageJson
+		return defaults, defaultEnvs, projects, scripts, vars, packageJson, pipes
 	}
 	config, err = ReadConfig("./.nrun.json")
 	if err != nil {
@@ -147,30 +174,53 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 		for k, v := range config.Vars {
 			vars[k] = v
 		}
+		for k, v := range config.Pipes {
+			klist := strings.Split(k, ",")
+			for _, k2 := range klist {
+				k2 = strings.TrimSpace(k)
+				if k2[0] == '@' && len(config.Projects[k2[1:]]) > 0 && config.Projects[k2[1:]] == path {
+					for k3, v2 := range v {
+						pipes[k3] = v2
+					}
+				} else if k2 == "*" {
+					for k3, v2 := range v {
+						pipes[k3] = v2
+					}
+				} else if k2 == path {
+					for k3, v2 := range v {
+						pipes[k3] = v2
+					}
+				}
+			}
+		}
 		if config.PackageJSONOverride != nil {
 			if packageJson["scripts"] == nil {
 				packageJson["scripts"] = make(map[string]interface{}, 1000)
 			}
-			for k, v := range config.PackageJSONOverride {
-				if path == k {
-					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.Map {
-						for k2, v2 := range v.(map[string]interface{}) {
-							for k3, v3 := range v2.(map[string]interface{}) {
-								if k2 == "scripts" {
-									packageJson["scripts"].(map[string]interface{})[k3] = v3
+			for kList, v := range config.PackageJSONOverride {
+				kList := strings.Split(kList, ",")
+				for _, k := range kList {
+					k = strings.TrimSpace(k)
+					if path == k {
+						vType := reflect.TypeOf(v)
+						if vType.Kind() == reflect.Map {
+							for k2, v2 := range v.(map[string]interface{}) {
+								for k3, v3 := range v2.(map[string]interface{}) {
+									if k2 == "scripts" {
+										packageJson["scripts"].(map[string]interface{})[k3] = v3
+									}
 								}
 							}
 						}
 					}
-				}
-				if len(k) > 1 && k[0] == '@' && len(config.Projects[k[1:]]) > 0 && config.Projects[k[1:]] == path {
-					vType := reflect.TypeOf(v)
-					if vType.Kind() == reflect.Map {
-						for k2, v2 := range v.(map[string]interface{}) {
-							for k3, v3 := range v2.(map[string]interface{}) {
-								if k2 == "scripts" {
-									packageJson["scripts"].(map[string]interface{})[k3] = v3
+					if len(k) > 1 && k[0] == '@' && len(config.Projects[k[1:]]) > 0 && config.Projects[k[1:]] == path {
+						vType := reflect.TypeOf(v)
+						if vType.Kind() == reflect.Map {
+							for k2, v2 := range v.(map[string]interface{}) {
+								for k3, v3 := range v2.(map[string]interface{}) {
+									if k2 == "scripts" {
+										packageJson["scripts"].(map[string]interface{})[k3] = v3
+									}
 								}
 							}
 						}
@@ -180,7 +230,7 @@ func GetDefaultValues(path string) (map[string]string, map[string]string, map[st
 		}
 	}
 
-	return defaults, defaultEnvs, projects, scripts, vars, packageJson
+	return defaults, defaultEnvs, projects, scripts, vars, packageJson, pipes
 }
 
 func ApplyPackageJSONOverrides(packageJSON *PackageJSON, packageJSONOverrides map[string]interface{}) *PackageJSON {
@@ -244,6 +294,13 @@ func ParseFlags() *FlagList {
 	flagList.SignJWTToken = flag.Bool("jwt-sign", false, "Sign a JWT token")
 	flagList.ValidateJWTToken = flag.String("jwt-validate", "", "Validate a JWT token")
 	flagList.TellAJoke = flag.Bool("joke", false, "Tell a joke")
+	flagList.VersionInformatrion = flag.Bool("vi", false, "Show version information")
+	flagList.NoOverride = flag.Bool("no", false, "Do not override the default values")
+	flagList.NoPackageJSONOverride = flag.Bool("npo", false, "Do not override the package.json")
+	flagList.NoDefaultValues2 = flag.Bool("ndv", false, "Do not use default values")
+	flagList.NoPipes = flag.Bool("np", false, "Do not use pipes")
+	flagList.ForcePipes = flag.Bool("fp", false, "Force pipes")
+	flagList.Sleep = flag.Int64("sleep", 0, "Sleep for a given amount of milliseconds")
 	// Inactive flags
 	flagList.TestAlarm = flag.Int64("t", 0, "Measure times in tests and notify when they are too long (time given in milliseconds)")
 
@@ -269,14 +326,46 @@ func ParseFlags() *FlagList {
 	return flagList
 }
 
-func Notify(message string) {
+var notifyQueue = make(chan string, 25)
+var NotifyWaitGroup sync.WaitGroup
+var WaitingNotifications int32 = 0
+
+func NotificationRunner() {
 	sayPath, err := exec.LookPath("say")
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
-	cmd := exec.Command(sayPath, []string{"--voice=Daniel", message}...)
-	cmd.Run()
+
+	var isActive bool = false
+	// Infinite loop to wait for messages
+	for {
+		for {
+			if !isActive {
+				break
+			}
+			time.Sleep(time.Millisecond * 10)
+		}
+		isActive = true
+		message := <-notifyQueue
+		cmd := exec.Command(sayPath, []string{"--voice=Daniel", message}...)
+		cmd.Start()
+		go func() {
+			atomic.AddInt32(&WaitingNotifications, -1)
+			cmd.Wait()
+			isActive = false
+			NotifyWaitGroup.Done()
+		}()
+	}
+}
+
+func Notify(message string) {
+	// Increment wait group
+	NotifyWaitGroup.Add(1)
+	// Increment number of waiting notifications
+	atomic.AddInt32(&WaitingNotifications, 1)
+	// Add message to queue
+	notifyQueue <- message
 }
 
 func FileExists(path string) bool {

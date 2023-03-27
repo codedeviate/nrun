@@ -180,7 +180,6 @@ func SignJWTToken(args []string) error {
 		return errors.New("No data provided")
 	}
 	return nil
-	return errors.New("Not implemented yet")
 }
 
 func ValidateJWTToken(flagList *FlagList, args []string) error {

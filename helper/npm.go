@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/shlex"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -11,9 +12,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 )
 
-func RunNPM(packageJSON PackageJSON, path string, script string, args []string, envs map[string]string, flagList *FlagList, Version string) {
+func RunNPM(packageJSON PackageJSON, path string, script string, args []string, envs map[string]string, flagList *FlagList, Version string, pipes map[string][]string) {
 	if flagList.BeVerbose != nil && *flagList.BeVerbose {
 		fmt.Print("Running ", script, " in ", path, " with ")
 		if len(args) > 0 {
@@ -25,7 +28,7 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
 			if len(packageJSON.Scripts["pre"+script]) > 0 {
-				RunNPM(packageJSON, path, "pre"+script, args, envs, flagList, Version)
+				RunNPM(packageJSON, path, "pre"+script, args, envs, flagList, Version, pipes)
 			}
 			runscript := packageJSON.Scripts[script]
 			match, _err := regexp.Match(`^[^\s]*nrun(\s|$)`, []byte(runscript))
@@ -41,10 +44,14 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 				log.Println(shellErr)
 				return
 			}
+
+			fmt.Println("Running", shell, strings.Join(args, " "))
 			cmd := exec.Command(shell, args...)
 
 			cmdEnv := cmd.Environ()
 
+			// The difference between NoDefaultValues and NoDefaultValues2 is that NoDefaultValues2 removes the default values
+			// from the config and NoDefaultValues only removes the default values from the current run
 			if flagList.NoDefaultValues == nil || *flagList.NoDefaultValues == false {
 				if len(envs[script]) > 0 {
 					envParts, _ := shlex.Split(envs[script])
@@ -135,6 +142,75 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			}
 			cmd.Env = finalEnv
 
+			// Add pipes
+			var pipeCmds []*exec.Cmd
+
+			if flagList.ForcePipes != nil && *flagList.ForcePipes == true && len(pipes) > 0 && len(pipes[script]) > 0 {
+				fmt.Println("Pipes are currently not fully supported")
+				fmt.Println("They are coming soon!")
+				fmt.Println("Please use the flag -np to disable pipes for now")
+				fmt.Println("Whatever happens from here on out is undefined behaviour")
+
+				lastCmd := cmd
+				cmd.Stderr = os.Stderr
+				wait4me := make(chan bool)
+				for _, pipe := range pipes[script] {
+					pipeParts, _ := shlex.Split(pipe)
+					pipeCmd := exec.Command(pipeParts[0], pipeParts[1:]...)
+					pipeCmd.Env = cmd.Env
+					r, w := io.Pipe()
+					lastCmd.Stdout = w
+					pipeCmd.Stdin = r
+					pipeCmds = append(pipeCmds, pipeCmd)
+					lastCmd = pipeCmd
+				}
+				go io.Copy(lastCmd.Stdout, os.Stdout)
+
+				go func(cmd *exec.Cmd) {
+					fmt.Println("1 Starting command:", cmd.Args)
+					err := cmd.Start()
+					if err != nil {
+						fmt.Println("1 Error:", err)
+						return
+					}
+					fmt.Println("1 Waiting on:", cmd.Args)
+					cmd.Wait()
+					fmt.Println("1 Finished command:", cmd.Args)
+					wait4me <- true
+				}(cmd)
+				for _, pipeCmd := range pipeCmds {
+					go func(pipeCmd *exec.Cmd) {
+						fmt.Println("2 Starting command:", pipeCmd.Args)
+						err := pipeCmd.Start()
+						fmt.Println("2 Started command:", pipeCmd.Args)
+						if err != nil {
+							fmt.Println("2 Error:", err)
+							return
+						}
+						fmt.Println("2 Waiting on:", pipeCmd.Args)
+						pipeCmd.Wait()
+						fmt.Println("2 Finished command:", pipeCmd.Args)
+					}(pipeCmd)
+				}
+				<-wait4me
+				for _, pipeCmd := range pipeCmds {
+					if pipeCmd.Process != nil {
+						fmt.Println("3 Killing command:", pipeCmd.Args)
+						pipeCmd.Process.Signal(syscall.SIGTERM)
+						pipeCmd.Process.Kill()
+					}
+				}
+				fmt.Println("4 Finished command:", cmd.Args)
+				time.Sleep(10 * time.Second)
+				return
+			}
+			if len(pipes) > 0 && len(pipes[script]) > 0 {
+				if flagList.NoPipes == nil || *flagList.NoPipes == false {
+					fmt.Println("Pipes are currently not supported")
+					fmt.Println("They are coming soon!")
+					fmt.Println("Please use the flag -fp to force the usage of pipes")
+				}
+			}
 			cmd.Stdout = os.Stdout
 			cmd.Stdin = os.Stdin
 			cmd.Stderr = os.Stderr
@@ -149,8 +225,9 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 				log.Println(runErr)
 				return
 			}
+
 			if len(packageJSON.Scripts["post"+script]) > 0 {
-				RunNPM(packageJSON, path, "post"+script, args, envs, flagList, Version)
+				RunNPM(packageJSON, path, "post"+script, args, envs, flagList, Version, pipes)
 			}
 		} else {
 			if PassthruNpm(packageJSON, script, args, envs, Version) == false {

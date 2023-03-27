@@ -16,6 +16,7 @@ type PackageJSON struct {
 type Config struct {
 	Env                 map[string]map[string]string    `json:"env"`
 	Path                map[string]map[string]string    `json:"path"`
+	Pipes               map[string]map[string][]string  `json:"pipes"`
 	Vars                map[string]string               `json:"vars"`
 	Projects            map[string]string               `json:"projects"`
 	Alias               map[string]string               `json:"alias"`
@@ -41,6 +42,7 @@ type LicenseList map[string][]string
 type FlagList struct {
 	ExecuteAlias             *bool
 	NoDefaultValues          *bool
+	NoDefaultValues2         *bool
 	ShowScript               *bool
 	ShowHelp                 *bool
 	ShowList                 *bool
@@ -85,6 +87,12 @@ type FlagList struct {
 	SignJWTToken             *bool
 	ValidateJWTToken         *string
 	TellAJoke                *bool
+	VersionInformatrion      *bool
+	NoOverride               *bool
+	NoPackageJSONOverride    *bool
+	NoPipes                  *bool
+	ForcePipes               *bool
+	Sleep                    *int64
 }
 
 type Memory struct {
