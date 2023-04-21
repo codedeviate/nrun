@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/shlex"
-	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -12,11 +11,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
-	"time"
 )
 
-func RunNPM(packageJSON PackageJSON, path string, script string, args []string, envs map[string]string, flagList *FlagList, Version string, pipes map[string][]string) {
+func RunNPM(packageJSON PackageJSON, path string, script string, args []string, envs map[string]string, flagList *FlagList, Version string, pipes map[string][]string) (int, error) {
 	if flagList.BeVerbose != nil && *flagList.BeVerbose {
 		fmt.Print("Running ", script, " in ", path, " with ")
 		if len(args) > 0 {
@@ -28,21 +25,25 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 	if len(packageJSON.Scripts) > 0 {
 		if len(packageJSON.Scripts[script]) > 0 {
 			if len(packageJSON.Scripts["pre"+script]) > 0 {
-				RunNPM(packageJSON, path, "pre"+script, args, envs, flagList, Version, pipes)
+				exitCode, err := RunNPM(packageJSON, path, "pre"+script, args, envs, flagList, Version, pipes)
+				if err != nil {
+					return exitCode, err
+				}
 			}
 			runscript := packageJSON.Scripts[script]
+
 			match, _err := regexp.Match(`^[^\s]*nrun(\s|$)`, []byte(runscript))
 			if _err == nil && match {
 				// This is a recursive call to nrun
 				log.Println("Recursive call to nrun detected")
-				return
+				return 0, nil
 			}
-			args = append([]string{packageJSON.Scripts[script]}, args...)
+			args = append([]string{runscript}, args...)
 			args = append([]string{"-c"}, args...)
 			shell, shellErr := GetShell()
 			if shellErr != nil {
 				log.Println(shellErr)
-				return
+				return 0, shellErr
 			}
 
 			fmt.Println("Running", shell, strings.Join(args, " "))
@@ -142,75 +143,33 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			}
 			cmd.Env = finalEnv
 
-			// Add pipes
-			var pipeCmds []*exec.Cmd
-
 			if flagList.ForcePipes != nil && *flagList.ForcePipes == true && len(pipes) > 0 && len(pipes[script]) > 0 {
-				fmt.Println("Pipes are currently not fully supported")
-				fmt.Println("They are coming soon!")
+				fmt.Println("Pipes are currently not supported")
+				fmt.Println("They might be coming soon!")
 				fmt.Println("Please use the flag -np to disable pipes for now")
 				fmt.Println("Whatever happens from here on out is undefined behaviour")
+				fmt.Println("The current status is: NOT WORKING AT ALL")
 
-				lastCmd := cmd
-				cmd.Stderr = os.Stderr
-				wait4me := make(chan bool)
-				for _, pipe := range pipes[script] {
-					pipeParts, _ := shlex.Split(pipe)
-					pipeCmd := exec.Command(pipeParts[0], pipeParts[1:]...)
-					pipeCmd.Env = cmd.Env
-					r, w := io.Pipe()
-					lastCmd.Stdout = w
-					pipeCmd.Stdin = r
-					pipeCmds = append(pipeCmds, pipeCmd)
-					lastCmd = pipeCmd
-				}
-				go io.Copy(lastCmd.Stdout, os.Stdout)
-
-				go func(cmd *exec.Cmd) {
-					fmt.Println("1 Starting command:", cmd.Args)
-					err := cmd.Start()
-					if err != nil {
-						fmt.Println("1 Error:", err)
-						return
-					}
-					fmt.Println("1 Waiting on:", cmd.Args)
-					cmd.Wait()
-					fmt.Println("1 Finished command:", cmd.Args)
-					wait4me <- true
-				}(cmd)
-				for _, pipeCmd := range pipeCmds {
-					go func(pipeCmd *exec.Cmd) {
-						fmt.Println("2 Starting command:", pipeCmd.Args)
-						err := pipeCmd.Start()
-						fmt.Println("2 Started command:", pipeCmd.Args)
-						if err != nil {
-							fmt.Println("2 Error:", err)
-							return
-						}
-						fmt.Println("2 Waiting on:", pipeCmd.Args)
-						pipeCmd.Wait()
-						fmt.Println("2 Finished command:", pipeCmd.Args)
-					}(pipeCmd)
-				}
-				<-wait4me
-				for _, pipeCmd := range pipeCmds {
-					if pipeCmd.Process != nil {
-						fmt.Println("3 Killing command:", pipeCmd.Args)
-						pipeCmd.Process.Signal(syscall.SIGTERM)
-						pipeCmd.Process.Kill()
-					}
-				}
-				fmt.Println("4 Finished command:", cmd.Args)
-				time.Sleep(10 * time.Second)
-				return
+				fmt.Println("Pipes:", pipes[script])
+				return 0, nil
 			}
 			if len(pipes) > 0 && len(pipes[script]) > 0 {
 				if flagList.NoPipes == nil || *flagList.NoPipes == false {
 					fmt.Println("Pipes are currently not supported")
-					fmt.Println("They are coming soon!")
-					fmt.Println("Please use the flag -fp to force the usage of pipes")
+					fmt.Println("They might be coming soon!")
+					fmt.Println("Please use the flag -fp to test the usage of pipes....(if they are supported and what might happen)")
 				}
 			}
+
+			//r, w, _ := os.Pipe()
+			//cmd.Stdout = w
+			//go func() {
+			//	scanner := bufio.NewScanner(r)
+			//	for scanner.Scan() {
+			//		// fmt.Println(scanner.Text())
+			//		fmt.Fprintf(os.Stdout, string(scanner.Bytes())+"\n")
+			//	}
+			//}()
 			cmd.Stdout = os.Stdout
 			cmd.Stdin = os.Stdin
 			cmd.Stderr = os.Stderr
@@ -221,24 +180,33 @@ func RunNPM(packageJSON PackageJSON, path string, script string, args []string, 
 			if errors.As(runErr, &exErr) {
 				Notify("Process failed with error-code " + strconv.Itoa(exErr.ExitCode()))
 				log.Println(runErr)
+				return exErr.ExitCode(), runErr
 			} else if runErr != nil {
 				log.Println(runErr)
-				return
+				return 0, runErr
 			}
 
 			if len(packageJSON.Scripts["post"+script]) > 0 {
-				RunNPM(packageJSON, path, "post"+script, args, envs, flagList, Version, pipes)
+				exitCode, err := RunNPM(packageJSON, path, "post"+script, args, envs, flagList, Version, pipes)
+				if err != nil {
+					return exitCode, err
+				}
 			}
 		} else {
-			if PassthruNpm(packageJSON, script, args, envs, Version) == false {
+			if InternalCommands(packageJSON, script, args, envs, Version) == true {
+				// Do nothing
+			} else if PassthruNpm(packageJSON, script, args, envs, Version) == false {
 				log.Println("Script", script, "does not exist")
 			}
 		}
 	} else {
-		if PassthruNpm(packageJSON, script, args, envs, Version) == false {
+		if InternalCommands(packageJSON, script, args, envs, Version) == true {
+			// Do nothing
+		} else if PassthruNpm(packageJSON, script, args, envs, Version) == false {
 			log.Println("No scripts defined in package.json")
 		}
 	}
+	return 0, nil
 }
 
 func PassthruNpm(packageJSON PackageJSON, script string, args []string, envs map[string]string, Version string) bool {

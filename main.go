@@ -15,7 +15,7 @@ const Version = "0.20.1"
 
 func main() {
 	go helper.NotificationRunner()
-	process()
+	exitCode, err := process()
 
 	for {
 		time.Sleep(100 * time.Millisecond)
@@ -23,9 +23,14 @@ func main() {
 			break
 		}
 	}
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	os.Exit(exitCode)
 }
 
-func process() {
+func process() (int, error) {
 	originalPath, _ := os.Getwd()
 	flagList := helper.ParseFlags()
 	timeStarted := time.Now()
@@ -35,33 +40,33 @@ func process() {
 
 	if flagList.UnpackJWTToken != nil && *flagList.UnpackJWTToken != false {
 		if len(args) == 0 {
-			helper.UnpackJWTToken("")
-			return
+			return 0, helper.UnpackJWTToken("")
 		}
 		for _, arg := range args {
-			helper.UnpackJWTToken(arg)
+			err := helper.UnpackJWTToken(arg)
+			if err != nil {
+				return 0, err
+			}
 		}
-		return
+		return 0, nil
 	}
 
 	if flagList.SignJWTToken != nil && *flagList.SignJWTToken == true {
-		helper.SignJWTToken(args)
-		return
+		return 0, helper.SignJWTToken(args)
 	}
 	if flagList.ValidateJWTToken != nil && *flagList.ValidateJWTToken != "" {
-		helper.ValidateJWTToken(flagList, args)
-		return
+		return 0, helper.ValidateJWTToken(flagList, args)
 	}
 
 	if flagList.PersonalFlags != nil && len(flagList.PersonalFlags) > 0 {
 		if helper.ExecutePersonalFlags(flagList) {
-			return
+			return 0, nil
 		}
 	}
 
 	if flagList.GetProjectPath != nil && *flagList.GetProjectPath {
 		helper.GetProjectPath(args)
-		return
+		return 0, nil
 	}
 
 	var script string
@@ -72,8 +77,7 @@ func process() {
 
 	path, wdErr := os.Getwd()
 	if wdErr != nil {
-		log.Println(wdErr)
-		return
+		return 0, wdErr
 	}
 
 	defer func() {
@@ -106,47 +110,47 @@ func process() {
 
 	if flagList.TellAJoke != nil && *flagList.TellAJoke {
 		helper.TellAJoke()
-		return
+		return 0, nil
 	}
 
 	if *flagList.SystemInfo {
 		helper.SystemInfo(Version)
-		return
+		return 0, nil
 	}
 
 	if *flagList.ShowHelp == true {
 		helper.ShowHelp(Version)
-		return
+		return 0, nil
 	}
 
 	if *flagList.ListProjects == true {
 		helper.ListProjectsFromConfig()
-		return
+		return 0, nil
 	}
 
 	if *flagList.AddProject == true {
 		helper.AddProjectToConfig(flag.Args())
-		return
+		return 0, nil
 	}
 
 	if *flagList.RemoveProject == true {
 		helper.RemoveProjectFromConfig(flag.Args())
-		return
+		return 0, nil
 	}
 
 	if *flagList.DummyCode == true {
 		helper.DummyCode()
-		return
+		return 0, nil
 	}
 
 	if *flagList.ShowVersion == true {
 		fmt.Println(Version)
-		return
+		return 0, nil
 	}
 
 	if *flagList.VersionInformatrion == true {
 		helper.VersionInformation()
-		return
+		return 0, nil
 	}
 	if *flagList.UseAnotherPath == "" {
 		env := os.Getenv("NRUNPROJECT")
@@ -163,7 +167,7 @@ func process() {
 		}
 		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 			log.Println("The path is not a directory")
-			return
+			return 0, nil
 		}
 		os.Chdir(path)
 	}
@@ -213,18 +217,18 @@ func process() {
 
 	if flagList.ExecuteCommandInProjects != nil && *flagList.ExecuteCommandInProjects == true {
 		helper.ExecuteCommandInProjects(path, script, args, defaultValues, defaultEnvironment, flagList, projects, pipes)
-		return
+		return 0, nil
 	}
 
 	if flagList.ExecuteCommand != nil && *flagList.ExecuteCommand == true {
 		helper.ExecuteCommand(path, script, args, defaultValues, defaultEnvironment, flagList, pipes)
-		return
+		return 0, nil
 	}
 
 	if flagList.ExecuteMultipleScripts != nil && *flagList.ExecuteMultipleScripts == true {
 		args = append([]string{script}, args...)
 		helper.ExecuteMultipleScripts(args, flagList)
-		return
+		return 0, nil
 	}
 
 	if flagList.ExecuteScript != nil && *flagList.ExecuteScript == true {
@@ -233,17 +237,17 @@ func process() {
 		} else {
 			log.Println("No script found")
 		}
-		return
+		return 0, nil
 	}
 
 	if flagList.ExecuteScriptInProjects != nil && *flagList.ExecuteScriptInProjects == true {
 		helper.ExecuteScriptList(script, scripts, args, projects, flagList)
-		return
+		return 0, nil
 	}
 
 	if flagList.ShowExecutableScript != nil && *flagList.ShowExecutableScript != "" {
 		helper.ShowExecutableScript(scripts, flagList)
-		return
+		return 0, nil
 	}
 
 	if flagList.AddToExecutableScript != nil && *flagList.AddToExecutableScript != "" {
@@ -251,7 +255,7 @@ func process() {
 			args = append([]string{script}, args...)
 		}
 		helper.AddToExecutableScript(args, flagList)
-		return
+		return 0, nil
 	}
 
 	if flagList.RemoveExecutableScript != nil && *flagList.RemoveExecutableScript != "" {
@@ -259,12 +263,12 @@ func process() {
 			args = append([]string{script}, args...)
 		}
 		helper.RemoveExecutableScript(*flagList.RemoveExecutableScript, args)
-		return
+		return 0, nil
 	}
 
 	if flagList.ListExecutableScripts != nil && *flagList.ListExecutableScripts == true {
 		helper.ListExecutableScripts(scripts, flagList)
-		return
+		return 0, nil
 	}
 
 	flagList.OriginalPath = originalPath
@@ -278,12 +282,12 @@ func process() {
 
 	if *flagList.ShowLicense == true {
 		helper.ShowLicense(path, script, args)
-		return
+		return 0, nil
 	}
 
 	if *flagList.ShowCurrentProjectInfo == true {
 		fmt.Println("Current project path is", path)
-		return
+		return 0, nil
 	}
 
 	if flagList.WebGetTemplate != nil && len(*flagList.WebGetTemplate) > 0 {
@@ -291,7 +295,7 @@ func process() {
 			args = append([]string{script}, args...)
 		}
 		helper.WebGetTemplate(args, flagList)
-		return
+		return 0, nil
 	}
 
 	if flagList.WebGet != nil && *flagList.WebGet {
@@ -299,7 +303,7 @@ func process() {
 			args = append([]string{script}, args...)
 		}
 		helper.WebGet(args, flagList)
-		return
+		return 0, nil
 	}
 
 	if flagList.ExecuteAlias != nil && *flagList.ExecuteAlias {
@@ -313,7 +317,7 @@ func process() {
 				helper.ExecuteAlias(alias, command, flagList)
 			}
 		}
-		return
+		return 0, nil
 	}
 
 	//if processErr != nil {
@@ -327,8 +331,8 @@ func process() {
 	} else if *flagList.ShowScript == true {
 		helper.ShowScript(*packageJSON, script)
 	} else {
-		helper.RunNPM(*packageJSON, path, script, args, defaultEnvironment, flagList, Version, pipes)
+		return helper.RunNPM(*packageJSON, path, script, args, defaultEnvironment, flagList, Version, pipes)
 	}
 	//}
-
+	return 0, nil
 }

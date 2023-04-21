@@ -331,11 +331,7 @@ var NotifyWaitGroup sync.WaitGroup
 var WaitingNotifications int32 = 0
 
 func NotificationRunner() {
-	sayPath, err := exec.LookPath("say")
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
+	sayPath, sayErr := exec.LookPath("say")
 
 	var isActive bool = false
 	// Infinite loop to wait for messages
@@ -348,14 +344,18 @@ func NotificationRunner() {
 		}
 		isActive = true
 		message := <-notifyQueue
-		cmd := exec.Command(sayPath, []string{"--voice=Daniel", message}...)
-		cmd.Start()
-		go func() {
-			atomic.AddInt32(&WaitingNotifications, -1)
-			cmd.Wait()
-			isActive = false
-			NotifyWaitGroup.Done()
-		}()
+		if sayErr == nil {
+			cmd := exec.Command(sayPath, []string{"--voice=Daniel", message}...)
+			cmd.Start()
+			go func() {
+				atomic.AddInt32(&WaitingNotifications, -1)
+				cmd.Wait()
+				isActive = false
+				NotifyWaitGroup.Done()
+			}()
+		} else {
+			fmt.Println(message)
+		}
 	}
 }
 
