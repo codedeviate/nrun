@@ -332,7 +332,12 @@ var WaitingNotifications int32 = 0
 
 func NotificationRunner() {
 	sayPath, sayErr := exec.LookPath("say")
-
+	if sayErr != nil {
+		return
+	}
+	if len(sayPath) == 0 {
+		return
+	}
 	var isActive bool = false
 	// Infinite loop to wait for messages
 	for {

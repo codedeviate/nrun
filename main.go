@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const Version = "0.20.1"
+const Version = "0.21.0"
 
 func main() {
 	go helper.NotificationRunner()
